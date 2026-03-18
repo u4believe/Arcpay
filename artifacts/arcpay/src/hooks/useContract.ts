@@ -170,7 +170,6 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
 
   const deposit = useCallback(async (amountStr: string) => {
     if (!signer || !address) return;
-    if (!contractState.tokenDeployed) throw new Error("Token contract not deployed");
     setTxStatus("approving");
     setTxError(null);
     setTxHash(null);
@@ -331,10 +330,15 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
 
 function parseContractError(err: unknown): string {
   if (!err) return "Unknown error";
-  const e = err as { reason?: string; message?: string; shortMessage?: string };
-  if (e.shortMessage) return e.shortMessage;
+  const e = err as { reason?: string; message?: string; shortMessage?: string; code?: string };
+  if (e.shortMessage) {
+    if (e.shortMessage.includes("could not decode")) return "Token contract call failed — the ERC20 token may not be deployed at the address the pool references.";
+    return e.shortMessage;
+  }
   if (e.reason) return e.reason;
+  if (e.code === "BAD_DATA") return "Token contract call failed — the ERC20 token may not be deployed at the address the pool references.";
   if (e.message) {
+    if (e.message.includes("BAD_DATA") || e.message.includes("could not decode")) return "Token contract call failed — the ERC20 token may not be deployed at the address the pool references.";
     if (e.message.includes("CommitmentNotFound")) return "Commitment not found in pool";
     if (e.message.includes("NullifierAlreadyUsed")) return "This note has already been withdrawn";
     if (e.message.includes("ContractPaused")) return "Contract is currently paused";

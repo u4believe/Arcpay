@@ -4,6 +4,7 @@ import {
   POOL_ADDRESS, POOL_ABI, ERC20_ABI,
   Note, saveNote, loadNotes, markNoteSpent,
   formatTokenAmount, parseTokenAmount,
+  generateSecret, computeCommitmentOffChain, computeNullifierOffChain,
 } from "@/lib/contract";
 import { ARC_CHAIN_PARAMS } from "@/lib/network";
 
@@ -16,9 +17,7 @@ export interface ContractState {
   tokenDecimals: number;
   feeBps: bigint;
   paused: boolean;
-  // ERC20 balance (may be unavailable if token not deployed)
   walletBalance: string;
-  // Native ARC balance — always available once address is known
   nativeBalance: string;
   tokenDeployed: boolean;
   loadingBalance: boolean;
@@ -57,7 +56,6 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     setContractState((s) => ({ ...s, loadingBalance: true, loadError: null }));
     try {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
-
       const [tokenAddr, feeBps, paused] = await Promise.all([
         pool.token(),
         pool.feeBps(),
@@ -82,15 +80,13 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         if (symResult.status === "fulfilled") {
           symbol = symResult.value as string;
         } else {
-          // Fallback: some tokens return bytes32 for symbol
           try {
             const raw = await readProvider.call({ to: tokenAddr as string, data: "0x95d89b41" });
             if (raw !== "0x") symbol = ethers.decodeBytes32String(raw.padEnd(66, "0").slice(0, 66));
           } catch { /* keep default */ }
         }
-        if (decResult.status === "fulfilled") {
-          decimals = Number(decResult.value);
-        }
+        if (decResult.status === "fulfilled") decimals = Number(decResult.value);
+
         if (walletAddr) {
           const balResult = await Promise.allSettled([token.balanceOf(walletAddr)]);
           walletBalance = balResult[0].status === "fulfilled"
@@ -99,7 +95,6 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         }
       }
 
-      // Always fetch native ARC balance when wallet connected
       if (walletAddr) {
         const natBal = await readProvider.getBalance(walletAddr);
         nativeBalance = parseFloat(ethers.formatEther(natBal)).toFixed(4);
@@ -119,8 +114,7 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
       });
     } catch (err: unknown) {
       const msg = (err as { shortMessage?: string; message?: string })?.shortMessage
-        || (err as { message?: string })?.message
-        || "Failed to load";
+        || (err as { message?: string })?.message || "Failed to load";
       console.error("loadContractInfo error:", err);
       setContractState((s) => ({ ...s, loadingBalance: false, loadError: msg.slice(0, 100) }));
     }
@@ -134,7 +128,6 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
       const tokenAddr: string = contractState.tokenAddress
         || (await pool.token() as string);
 
-      // Always get native balance
       const natBal = await readProvider.getBalance(address);
       const nativeBalance = parseFloat(ethers.formatEther(natBal)).toFixed(4);
 
@@ -151,7 +144,6 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
       }
 
       const pausedResult = await Promise.allSettled([pool.paused()]);
-
       setContractState((s) => ({
         ...s,
         tokenAddress: tokenAddr,
@@ -169,11 +161,12 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     }
   }, [address, contractState.tokenAddress, contractState.tokenDecimals, contractState.walletBalance]);
 
-  // Load contract info whenever address changes (including on first mount)
   useEffect(() => {
     loadContractInfo(address);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
+
+  // ── Deposit ──────────────────────────────────────────────────────────────
 
   const deposit = useCallback(async (amountStr: string) => {
     if (!signer || !address) return;
@@ -185,38 +178,53 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     let tokenAddr = contractState.tokenAddress;
     const tokenDecimals = contractState.tokenDecimals;
     if (!tokenAddr) {
-      const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
-      tokenAddr = await pool.token() as string;
+      const p = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
+      tokenAddr = await p.token() as string;
     }
 
     try {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
       const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
-      const amountWei = parseTokenAmount(amountStr, tokenDecimals);
-      if (amountWei === 0n) throw new Error("Invalid amount");
 
-      const secret = ethers.hexlify(ethers.randomBytes(32));
-      const [commitment, netAmount] = await Promise.all([
-        pool.computeCommitment(secret, amountWei),
-        pool.getNetDepositAmount(amountWei),
-      ]);
+      const grossAmount = parseTokenAmount(amountStr, tokenDecimals);
+      if (grossAmount === 0n) throw new Error("Invalid amount");
 
+      // 1. Get netAmount from contract (amount after fee)
+      const netAmount: bigint = await pool.getNetDepositAmount(grossAmount);
+
+      // 2. Generate secret using browser CSPRNG (no chain data)
+      const secret = generateSecret();
+
+      // 3. Compute commitment entirely off-chain
+      const commitment = computeCommitmentOffChain(secret, netAmount);
+
+      // 4. Optionally verify our commitment matches contract's computation
+      //    (cross-check during development — no extra tx cost, it's a pure view)
+      const contractCommitment: string = await pool.computeCommitment(secret, netAmount);
+      if (commitment.toLowerCase() !== contractCommitment.toLowerCase()) {
+        throw new Error("Commitment mismatch — possible contract ABI change. Please reload.");
+      }
+
+      // 5. Approve token spend
       const allowance: bigint = await token.allowance(address, POOL_ADDRESS);
-      if (allowance < amountWei) {
-        const approveTx = await token.approve(POOL_ADDRESS, amountWei);
+      if (allowance < grossAmount) {
+        const approveTx = await token.approve(POOL_ADDRESS, grossAmount);
         await approveTx.wait();
       }
 
+      // 6. Deposit: pass (grossAmount, netAmount, commitment)
       setTxStatus("depositing");
-      const tx = await pool.deposit(amountWei, netAmount, commitment);
+      const tx = await pool.deposit(grossAmount, netAmount, commitment);
       const receipt = await tx.wait();
       setTxHash(receipt.hash);
 
+      // 7. Save note — store netAmount (used in withdraw), grossAmount for display
       const note: Note = {
         id: `${receipt.hash}-${Date.now()}`,
         secret,
-        amount: amountWei.toString(),
-        amountFormatted: formatTokenAmount(netAmount as bigint, tokenDecimals),
+        grossAmount: grossAmount.toString(),
+        netAmount: netAmount.toString(),
+        amountFormatted: formatTokenAmount(netAmount, tokenDecimals),
         commitment,
         timestamp: Date.now(),
         txHash: receipt.hash,
@@ -231,6 +239,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
       setTxStatus("error");
     }
   }, [signer, address, contractState, refreshNotes, refreshBalance]);
+
+  // ── Withdraw ─────────────────────────────────────────────────────────────
 
   const withdraw = useCallback(async (
     secretOrNoteId: string,
@@ -247,27 +257,46 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     try {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
 
-      let secret = secretOrNoteId;
+      let secret: string;
+      let netAmountWei: bigint;
       let noteId: string | null = null;
-      let useAmount = amountStr;
 
       if (isNoteId) {
         const note = notes.find((n) => n.id === secretOrNoteId);
         if (!note) throw new Error("Note not found");
         secret = note.secret;
         noteId = note.id;
-        useAmount = formatTokenAmount(BigInt(note.amount), tokenDecimals);
+        // Use netAmount from the note (the post-fee amount stored at deposit time)
+        netAmountWei = BigInt(note.netAmount);
+      } else {
+        secret = secretOrNoteId;
+        netAmountWei = parseTokenAmount(amountStr, tokenDecimals);
       }
 
-      const amountWei = parseTokenAmount(useAmount, tokenDecimals);
-      if (amountWei === 0n) throw new Error("Invalid amount");
+      if (netAmountWei === 0n) throw new Error("Invalid amount");
+
+      // Pre-verify the note before sending transaction (saves gas on likely failures)
+      const commitment = computeCommitmentOffChain(secret, netAmountWei);
+      const nullifier = computeNullifierOffChain(secret);
+
+      const [countResult, usedResult] = await Promise.allSettled([
+        pool.commitmentCount(commitment),
+        pool.usedNullifiers(nullifier),
+      ]);
+
+      if (countResult.status === "fulfilled" && BigInt(countResult.value as bigint) < 1n) {
+        throw new Error("Commitment not found in pool — check your secret and amount");
+      }
+      if (usedResult.status === "fulfilled" && usedResult.value === true) {
+        throw new Error("This note has already been withdrawn");
+      }
 
       const signerAddress = await signer.getAddress();
       let tx;
       if (recipient && recipient.toLowerCase() !== signerAddress.toLowerCase()) {
-        tx = await pool.withdrawTo(recipient, amountWei, secret);
+        tx = await pool.withdrawTo(recipient, netAmountWei, secret);
       } else {
-        tx = await pool.withdraw(amountWei, secret);
+        tx = await pool.withdraw(netAmountWei, secret);
       }
 
       const receipt = await tx.wait();

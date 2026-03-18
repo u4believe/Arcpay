@@ -94,7 +94,7 @@ export default function Home() {
 
   const totalShielded = notes
     .filter((n) => !n.spent)
-    .reduce((acc, n) => acc + BigInt(n.amount), 0n);
+    .reduce((acc, n) => acc + BigInt(n.netAmount ?? n.grossAmount ?? "0"), 0n);
 
   const totalShieldedFormatted = totalShielded > 0n
     ? `$${parseFloat(formatTokenAmount(totalShielded, contractState.tokenDecimals)).toFixed(2)}`
@@ -105,6 +105,7 @@ export default function Home() {
       const timer = setTimeout(resetTx, 5000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [txStatus, resetTx]);
 
   const handleDeposit = () => {

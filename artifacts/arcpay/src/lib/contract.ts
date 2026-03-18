@@ -36,11 +36,60 @@ export const ERC20_ABI = [
   "function symbol() view returns (string)",
 ];
 
+// ─── Off-chain commitment/nullifier helpers (must match PrivacyPool contract) ──
+
+/**
+ * NULLIFIER_DOMAIN = keccak256("PrivacyPool.v1.nullifier")
+ * Must match the constant in the Solidity contract.
+ */
+export const NULLIFIER_DOMAIN: string = ethers.keccak256(
+  ethers.toUtf8Bytes("PrivacyPool.v1.nullifier")
+);
+
+/**
+ * Generate a 32-byte secret using the browser's CSPRNG.
+ * Never uses block data, timestamp, or any on-chain value.
+ */
+export function generateSecret(): string {
+  const buf = new Uint8Array(32);
+  crypto.getRandomValues(buf);
+  return "0x" + Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * commitment = keccak256(abi.encodePacked(secret, netAmount))
+ * secret   → bytes32
+ * netAmount → uint256
+ */
+export function computeCommitmentOffChain(secret: string, netAmount: bigint): string {
+  return ethers.keccak256(
+    ethers.solidityPacked(["bytes32", "uint256"], [secret, netAmount])
+  );
+}
+
+/**
+ * nullifier = keccak256(abi.encodePacked(NULLIFIER_DOMAIN, secret))
+ * Both typed as bytes32.
+ */
+export function computeNullifierOffChain(secret: string): string {
+  return ethers.keccak256(
+    ethers.solidityPacked(["bytes32", "bytes32"], [NULLIFIER_DOMAIN, secret])
+  );
+}
+
+// ─── Note format ─────────────────────────────────────────────────────────────
+
 export interface Note {
   id: string;
+  /** 0x-prefixed 32-byte hex secret. Never share until withdraw. */
   secret: string;
-  amount: string;
+  /** Gross deposit amount (wei string) — what the user approved. */
+  grossAmount: string;
+  /** Net amount (wei string) = getNetDepositAmount(grossAmount). Used in withdraw(). */
+  netAmount: string;
+  /** Human-readable net amount string (e.g. "99.0"). */
   amountFormatted: string;
+  /** Off-chain computed commitment = keccak256(pack(secret, netAmount)). */
   commitment: string;
   timestamp: number;
   txHash: string;

@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 
-export const POOL_ADDRESS = "0xc4f7ccf73c56c6715c6f2eac40f18802fb00b55d";
+export const POOL_ADDRESS = "0x3561df6cf9a669e16423229f26504033ab229346";
 
 export const POOL_ABI = [
   "constructor(address _token)",

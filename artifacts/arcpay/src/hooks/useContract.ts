@@ -16,7 +16,11 @@ export interface ContractState {
   tokenDecimals: number;
   feeBps: bigint;
   paused: boolean;
+  // ERC20 balance (may be unavailable if token not deployed)
   walletBalance: string;
+  // Native ARC balance — always available once address is known
+  nativeBalance: string;
+  tokenDeployed: boolean;
   loadingBalance: boolean;
   loadError: string | null;
 }
@@ -26,11 +30,13 @@ export type TxStatus = "idle" | "approving" | "depositing" | "withdrawing" | "su
 export function useContract(signer: ethers.JsonRpcSigner | null, address: string | null) {
   const [contractState, setContractState] = useState<ContractState>({
     tokenAddress: null,
-    tokenSymbol: "—",
+    tokenSymbol: "TOKEN",
     tokenDecimals: 6,
     feeBps: 0n,
     paused: false,
     walletBalance: "—",
+    nativeBalance: "—",
+    tokenDeployed: true,
     loadingBalance: true,
     loadError: null,
   });
@@ -58,40 +64,45 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         pool.paused(),
       ]);
 
+      // Check if ERC20 token contract is actually deployed
+      const tokenCode = await readProvider.getCode(tokenAddr as string);
+      const tokenDeployed = tokenCode !== "0x" && tokenCode.length > 2;
+
       let symbol = "TOKEN";
       let decimals = 6;
       let walletBalance = "—";
+      let nativeBalance = "—";
 
-      const token = new ethers.Contract(tokenAddr as string, ERC20_ABI, readProvider);
-
-      const [symResult, decResult] = await Promise.allSettled([
-        token.symbol(),
-        token.decimals(),
-      ]);
-
-      if (symResult.status === "fulfilled") {
-        symbol = symResult.value as string;
-      } else {
-        // Some tokens (old USDC) return bytes32 for symbol — try decoding
-        try {
-          const raw = await readProvider.call({ to: tokenAddr as string, data: "0x95d89b41" });
-          symbol = ethers.decodeBytes32String(raw);
-        } catch {
-          symbol = "TOKEN";
-        }
-      }
-
-      if (decResult.status === "fulfilled") {
-        decimals = Number(decResult.value);
-      }
-
-      if (walletAddr) {
-        const balResult = await Promise.allSettled([token.balanceOf(walletAddr)]);
-        if (balResult[0].status === "fulfilled") {
-          walletBalance = formatTokenAmount(balResult[0].value as bigint, decimals);
+      if (tokenDeployed) {
+        const token = new ethers.Contract(tokenAddr as string, ERC20_ABI, readProvider);
+        const [symResult, decResult] = await Promise.allSettled([
+          token.symbol(),
+          token.decimals(),
+        ]);
+        if (symResult.status === "fulfilled") {
+          symbol = symResult.value as string;
         } else {
-          walletBalance = "0";
+          // Fallback: some tokens return bytes32 for symbol
+          try {
+            const raw = await readProvider.call({ to: tokenAddr as string, data: "0x95d89b41" });
+            if (raw !== "0x") symbol = ethers.decodeBytes32String(raw.padEnd(66, "0").slice(0, 66));
+          } catch { /* keep default */ }
         }
+        if (decResult.status === "fulfilled") {
+          decimals = Number(decResult.value);
+        }
+        if (walletAddr) {
+          const balResult = await Promise.allSettled([token.balanceOf(walletAddr)]);
+          walletBalance = balResult[0].status === "fulfilled"
+            ? formatTokenAmount(balResult[0].value as bigint, decimals)
+            : "0";
+        }
+      }
+
+      // Always fetch native ARC balance when wallet connected
+      if (walletAddr) {
+        const natBal = await readProvider.getBalance(walletAddr);
+        nativeBalance = parseFloat(ethers.formatEther(natBal)).toFixed(4);
       }
 
       setContractState({
@@ -101,6 +112,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         feeBps: feeBps as bigint,
         paused: paused as boolean,
         walletBalance,
+        nativeBalance,
+        tokenDeployed,
         loadingBalance: false,
         loadError: null,
       });
@@ -109,43 +122,54 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         || (err as { message?: string })?.message
         || "Failed to load";
       console.error("loadContractInfo error:", err);
-      setContractState((s) => ({ ...s, loadingBalance: false, loadError: msg.slice(0, 80) }));
+      setContractState((s) => ({ ...s, loadingBalance: false, loadError: msg.slice(0, 100) }));
     }
   }, []);
 
   const refreshBalance = useCallback(async () => {
     if (!address) return;
-    setContractState((s) => ({ ...s, loadingBalance: true, loadError: null }));
+    setContractState((s) => ({ ...s, loadingBalance: true }));
     try {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
       const tokenAddr: string = contractState.tokenAddress
         || (await pool.token() as string);
-      const token = new ethers.Contract(tokenAddr, ERC20_ABI, readProvider);
 
-      const [paused, bal] = await Promise.allSettled([
-        pool.paused(),
-        token.balanceOf(address),
-      ]);
+      // Always get native balance
+      const natBal = await readProvider.getBalance(address);
+      const nativeBalance = parseFloat(ethers.formatEther(natBal)).toFixed(4);
+
+      let walletBalance = contractState.walletBalance;
+      const tokenCode = await readProvider.getCode(tokenAddr);
+      const tokenDeployed = tokenCode !== "0x" && tokenCode.length > 2;
+
+      if (tokenDeployed) {
+        const token = new ethers.Contract(tokenAddr, ERC20_ABI, readProvider);
+        const balResult = await Promise.allSettled([token.balanceOf(address)]);
+        if (balResult[0].status === "fulfilled") {
+          walletBalance = formatTokenAmount(balResult[0].value as bigint, contractState.tokenDecimals);
+        }
+      }
+
+      const pausedResult = await Promise.allSettled([pool.paused()]);
 
       setContractState((s) => ({
         ...s,
         tokenAddress: tokenAddr,
+        tokenDeployed,
+        nativeBalance,
+        walletBalance,
         loadingBalance: false,
-        loadError: null,
-        paused: paused.status === "fulfilled" ? (paused.value as boolean) : s.paused,
-        walletBalance: bal.status === "fulfilled"
-          ? formatTokenAmount(bal.value as bigint, s.tokenDecimals)
-          : s.walletBalance,
+        paused: pausedResult[0].status === "fulfilled" ? (pausedResult[0].value as boolean) : s.paused,
       }));
     } catch (err: unknown) {
       const msg = (err as { shortMessage?: string; message?: string })?.shortMessage
         || (err as { message?: string })?.message || "Refresh failed";
       console.error("refreshBalance error:", err);
-      setContractState((s) => ({ ...s, loadingBalance: false, loadError: msg.slice(0, 80) }));
+      setContractState((s) => ({ ...s, loadingBalance: false, loadError: msg.slice(0, 100) }));
     }
-  }, [address, contractState.tokenAddress, contractState.tokenDecimals]);
+  }, [address, contractState.tokenAddress, contractState.tokenDecimals, contractState.walletBalance]);
 
-  // Load contract info on mount (no wallet needed for read-only)
+  // Load contract info whenever address changes (including on first mount)
   useEffect(() => {
     loadContractInfo(address);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,13 +177,13 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
 
   const deposit = useCallback(async (amountStr: string) => {
     if (!signer || !address) return;
+    if (!contractState.tokenDeployed) throw new Error("Token contract not deployed");
     setTxStatus("approving");
     setTxError(null);
     setTxHash(null);
 
-    // Re-read token address if not set
     let tokenAddr = contractState.tokenAddress;
-    let tokenDecimals = contractState.tokenDecimals;
+    const tokenDecimals = contractState.tokenDecimals;
     if (!tokenAddr) {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
       tokenAddr = await pool.token() as string;

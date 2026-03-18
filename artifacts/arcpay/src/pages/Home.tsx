@@ -354,21 +354,21 @@ export default function Home() {
             Chain {wallet.chainId}
           </span>
         </div>
-        {/* Wallet token balance */}
+        {/* Wallet balance — native ARC always shown; ERC20 shown when token is deployed */}
         <div style={{ marginBottom: 8 }}>
           <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, margin: "0 0 2px" }}>
-            Wallet {contractState.tokenSymbol} Balance
+            {contractState.tokenDeployed
+              ? `Wallet ${contractState.tokenSymbol} Balance`
+              : "Wallet ARC Balance"}
           </p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-            <p style={{ color: contractState.loadError ? t.ERROR_COLOR : "white", fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.5px" }}>
+            <p style={{ color: "white", fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.5px" }}>
               {balanceVisible
                 ? contractState.loadingBalance
                   ? "…"
-                  : contractState.loadError
-                    ? "Error"
-                    : contractState.walletBalance === "—"
-                      ? "—"
-                      : `${parseFloat(contractState.walletBalance).toFixed(2)}`
+                  : contractState.tokenDeployed
+                    ? (contractState.walletBalance === "—" ? "—" : `${parseFloat(contractState.walletBalance).toFixed(2)}`)
+                    : (contractState.nativeBalance === "—" ? "—" : contractState.nativeBalance)
                 : "•••••"}
             </p>
             <button
@@ -388,6 +388,11 @@ export default function Home() {
                 : <EyeOff style={{ width: 13, height: 13, color: "rgba(255,255,255,0.7)" }} />}
             </button>
           </div>
+          {!contractState.loadingBalance && !contractState.tokenDeployed && (
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "rgba(251,191,36,0.9)" }}>
+              ⚠ Pool token not deployed at {contractState.tokenAddress?.slice(0, 10)}… — deposit/withdraw unavailable
+            </p>
+          )}
           {contractState.loadError && (
             <p style={{ margin: "4px 0 0", fontSize: 11, color: "rgba(248,113,113,0.85)" }}>
               ⚠ {contractState.loadError}

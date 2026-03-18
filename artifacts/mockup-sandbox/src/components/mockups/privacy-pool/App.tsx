@@ -112,7 +112,7 @@ export function App() {
             Private Payments,<br />Made Simple
           </h1>
           <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-            Shield your ETH with zero-knowledge proofs.<br />Send and receive with complete privacy.
+            Send and receive USDC with complete privacy on Arc Blockchain.
           </p>
         </div>
 

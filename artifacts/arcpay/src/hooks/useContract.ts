@@ -45,8 +45,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
   const [txError, setTxError] = useState<string | null>(null);
 
   const refreshNotes = useCallback(() => {
-    setNotes(loadNotes());
-  }, []);
+    setNotes(address ? loadNotes(address) : []);
+  }, [address]);
 
   useEffect(() => {
     refreshNotes();
@@ -229,7 +229,7 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         txHash: receipt.hash,
         spent: false,
       };
-      saveNote(note);
+      saveNote(note, address);
       refreshNotes();
       setTxStatus("success");
       setTimeout(() => refreshBalance(), 2000);
@@ -301,8 +301,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
       const receipt = await tx.wait();
       setTxHash(receipt.hash);
 
-      if (noteId) {
-        markNoteSpent(noteId);
+      if (noteId && address) {
+        markNoteSpent(noteId, address);
         refreshNotes();
       }
       setTxStatus("success");

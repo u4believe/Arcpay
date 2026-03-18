@@ -96,26 +96,29 @@ export interface Note {
   spent: boolean;
 }
 
-const NOTES_KEY = "arcpay_notes";
-
-export function saveNote(note: Note) {
-  const notes = loadNotes();
-  notes.unshift(note);
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+/** Returns the localStorage key scoped to a specific wallet address. */
+function notesKey(address: string): string {
+  return `arcpay_notes_${address.toLowerCase()}`;
 }
 
-export function loadNotes(): Note[] {
+export function saveNote(note: Note, address: string) {
+  const notes = loadNotes(address);
+  notes.unshift(note);
+  localStorage.setItem(notesKey(address), JSON.stringify(notes));
+}
+
+export function loadNotes(address: string): Note[] {
   try {
-    return JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
+    return JSON.parse(localStorage.getItem(notesKey(address)) || "[]");
   } catch {
     return [];
   }
 }
 
-export function markNoteSpent(id: string) {
-  const notes = loadNotes();
+export function markNoteSpent(id: string, address: string) {
+  const notes = loadNotes(address);
   const updated = notes.map((n) => (n.id === id ? { ...n, spent: true } : n));
-  localStorage.setItem(NOTES_KEY, JSON.stringify(updated));
+  localStorage.setItem(notesKey(address), JSON.stringify(updated));
 }
 
 export function formatTokenAmount(raw: bigint, decimals: number): string {

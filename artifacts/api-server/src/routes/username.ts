@@ -4,7 +4,7 @@ import path from "path";
 
 const router: IRouter = Router();
 
-const DATA_FILE = path.join(process.cwd(), "artifacts/api-server/data/usernames.json");
+const DATA_FILE = path.join(process.cwd(), "data/usernames.json");
 
 interface UsernameStore {
   byAddress: Record<string, string>;  // address.toLowerCase() → username

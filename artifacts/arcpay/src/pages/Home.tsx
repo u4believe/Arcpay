@@ -303,8 +303,10 @@ export default function Home() {
               <span style={{ fontSize: 11, color: t.ERROR_COLOR, fontWeight: 600 }}>Paused</span>
             </div>
           )}
-          <Bell style={{ width: 18, height: 18, color: t.TEXT_MUTED, cursor: "pointer" }} />
-          <Settings style={{ width: 18, height: 18, color: t.TEXT_MUTED, cursor: "pointer" }} />
+          <Settings
+            onClick={() => setActiveNav(activeNav === "profile" ? "home" : "profile")}
+            style={{ width: 18, height: 18, color: activeNav === "profile" ? t.PP_BLUE : t.TEXT_MUTED, cursor: "pointer", transition: "color 0.15s" }}
+          />
           <ThemeToggle />
           <div style={{ position: "relative" }}>
             <button

@@ -1,8 +1,0 @@
-{
-  "byAddress": {
-    "0xabc123": "testuser"
-  },
-  "byUsername": {
-    "testuser": "0xabc123"
-  }
-}

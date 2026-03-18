@@ -80,6 +80,7 @@ export default function Home() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"deposit" | "withdraw" | "notes">("deposit");
   const [activeNav, setActiveNav] = useState("home");
   const [isDark, setIsDark] = useState(true);
@@ -105,6 +106,16 @@ export default function Home() {
   const totalShieldedFormatted = totalShielded > 0n
     ? `$${parseFloat(formatTokenAmount(totalShielded, contractState.tokenDecimals)).toFixed(2)}`
     : "$0.00";
+
+  // Clear sensitive withdraw fields whenever the connected wallet changes
+  useEffect(() => {
+    setWithdrawSecret("");
+    setWithdrawAmount("");
+    setRecipientAddress("");
+    setSelectedNoteId(null);
+    setDepositAmount("");
+    setCopiedNoteId(null);
+  }, [wallet.address]);
 
   useEffect(() => {
     if (txStatus === "success" || txStatus === "error") {
@@ -774,8 +785,18 @@ export default function Home() {
                           <code style={{ fontSize: 10, color: t.TEXT_MUTED, background: t.INPUT_BG, border: `1px solid ${t.INPUT_BORDER}`, borderRadius: 4, padding: "2px 6px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {note.secret}
                           </code>
-                          <button onClick={() => navigator.clipboard.writeText(note.secret)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: t.TEXT_MUTED }}>
-                            <Copy style={{ width: 12, height: 12 }} />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(note.secret);
+                              setCopiedNoteId(note.id);
+                              setTimeout(() => setCopiedNoteId(null), 2000);
+                            }}
+                            title={copiedNoteId === note.id ? "Copied!" : "Copy secret"}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: copiedNoteId === note.id ? t.DEPOSIT_COLOR : t.TEXT_MUTED, transition: "color 0.15s" }}
+                          >
+                            {copiedNoteId === note.id
+                              ? <CheckCircle2 style={{ width: 12, height: 12 }} />
+                              : <Copy style={{ width: 12, height: 12 }} />}
                           </button>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

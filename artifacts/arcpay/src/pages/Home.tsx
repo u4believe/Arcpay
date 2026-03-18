@@ -81,6 +81,7 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState("home");
   const [isDark, setIsDark] = useState(true);
   const [switchingNetwork, setSwitchingNetwork] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const t = isDark ? dark : light;
   const wrongNetwork = wallet.address && wallet.chainId !== null && wallet.chainId !== ARC_CHAIN_ID;
@@ -283,8 +284,37 @@ export default function Home() {
           <Bell style={{ width: 18, height: 18, color: t.TEXT_MUTED, cursor: "pointer" }} />
           <Settings style={{ width: 18, height: 18, color: t.TEXT_MUTED, cursor: "pointer" }} />
           <ThemeToggle />
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: t.PP_BLUE_LIGHT, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            <User style={{ width: 16, height: 16, color: t.PP_BLUE }} />
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px 5px 6px", borderRadius: 20, border: `1px solid ${t.CARD_BORDER}`, background: t.INPUT_BG, cursor: "pointer" }}
+            >
+              <div style={{ width: 22, height: 22, borderRadius: "50%", background: t.PP_BLUE_LIGHT, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <User style={{ width: 12, height: 12, color: t.PP_BLUE }} />
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: t.TEXT, fontFamily: "monospace" }}>
+                {shortenAddress(wallet.address)}
+              </span>
+            </button>
+            {showProfileMenu && (
+              <>
+                <div onClick={() => setShowProfileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: t.CARD, border: `1px solid ${t.CARD_BORDER}`, borderRadius: 12, boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 200, overflow: "hidden" }}>
+                  <div style={{ padding: "12px 14px", borderBottom: `1px solid ${t.SEPARATOR}` }}>
+                    <p style={{ margin: 0, fontSize: 11, color: t.TEXT_MUTED }}>Connected wallet</p>
+                    <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 600, color: t.TEXT, fontFamily: "monospace" }}>{shortenAddress(wallet.address)}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 11, color: t.TEXT_MUTED }}>Chain ID: {wallet.chainId}</p>
+                  </div>
+                  <button
+                    onClick={() => { wallet.disconnect(); setShowProfileMenu(false); }}
+                    style={{ width: "100%", padding: "11px 14px", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: t.ERROR_COLOR, fontSize: 13, fontWeight: 600, textAlign: "left" }}
+                  >
+                    <XCircle style={{ width: 15, height: 15 }} />
+                    Disconnect
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

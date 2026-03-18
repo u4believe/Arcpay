@@ -217,7 +217,7 @@ export default function Home() {
         <style>{`@keyframes spin { to { transform: rotate(360deg); } } input::placeholder { color: ${t.TEXT_DIM}; }`}</style>
 
         <div style={{ background: t.NAV_BG, borderBottom: `1px solid ${t.CARD_BORDER}`, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ color: t.TEXT, fontWeight: 700, fontSize: 17, letterSpacing: "-0.3px" }}>Arcpay</span>
+          <span style={{ color: t.TEXT, fontWeight: 700, fontSize: 17, letterSpacing: "-0.3px", cursor: "default" }}>Arcpay</span>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ color: t.TEXT_MUTED, fontSize: 12 }}>Powered by zkShield</span>
             <ThemeToggle />
@@ -295,7 +295,10 @@ export default function Home() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } input::placeholder { color: ${t.TEXT_DIM}; }`}</style>
 
       <div style={{ background: t.NAV_BG, borderBottom: `1px solid ${t.CARD_BORDER}`, padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
-        <span style={{ color: t.TEXT, fontWeight: 700, fontSize: 16 }}>Arcpay</span>
+        <span
+          onClick={() => setActiveNav("home")}
+          style={{ color: t.TEXT, fontWeight: 700, fontSize: 16, cursor: "pointer" }}
+        >Arcpay</span>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {contractState.paused && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, background: t.ERROR_BG, border: `1px solid ${t.ERROR_BORDER}`, borderRadius: 6, padding: "3px 8px" }}>

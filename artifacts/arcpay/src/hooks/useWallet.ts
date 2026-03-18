@@ -38,7 +38,7 @@ export function useWallet() {
     setState((s) => ({ ...s, connecting: true, error: null }));
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
+      await provider.send("wallet_requestPermissions", [{ eth_accounts: {} }]);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const network = await provider.getNetwork();

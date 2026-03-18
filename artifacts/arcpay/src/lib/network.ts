@@ -1,10 +1,10 @@
-export const ARC_CHAIN_ID = 5758;
+export const ARC_CHAIN_ID = 5042002;
 
 export const ARC_CHAIN_PARAMS = {
   chainId: `0x${ARC_CHAIN_ID.toString(16)}`,
-  chainName: "Arc Blockchain",
+  chainName: "Arc Testnet",
   nativeCurrency: { name: "ARC", symbol: "ARC", decimals: 18 },
-  rpcUrls: ["https://rpc.arc.io"],
+  rpcUrls: ["https://rpc.testnet.arc.network"],
   blockExplorerUrls: ["https://explorer.arc.fun"],
 };
 

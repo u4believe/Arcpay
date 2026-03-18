@@ -12,7 +12,8 @@ export interface ContractState {
   tokenDecimals: number;
   feeBps: bigint;
   paused: boolean;
-  loading: boolean;
+  walletBalance: string;
+  loadingBalance: boolean;
 }
 
 export type TxStatus = "idle" | "approving" | "depositing" | "withdrawing" | "success" | "error";
@@ -24,7 +25,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     tokenDecimals: 6,
     feeBps: 0n,
     paused: false,
-    loading: false,
+    walletBalance: "0",
+    loadingBalance: false,
   });
   const [notes, setNotes] = useState<Note[]>([]);
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
@@ -39,31 +41,77 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     refreshNotes();
   }, [refreshNotes]);
 
-  useEffect(() => {
-    if (!signer) return;
-    let cancelled = false;
-    (async () => {
+  const loadContractInfo = useCallback(async () => {
+    if (!signer || !address) return;
+    try {
+      const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+
+      const [tokenAddr, feeBps, paused] = await Promise.all([
+        pool.token(),
+        pool.feeBps(),
+        pool.paused(),
+      ]);
+
+      let symbol = "TOKEN";
+      let decimals = 18;
+      let walletBalance = "0";
+
       try {
-        const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
-        const [tokenAddr, feeBps, paused] = await Promise.all([
-          pool.token(),
-          pool.feeBps(),
-          pool.paused(),
-        ]);
         const token = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
-        const [symbol, decimals] = await Promise.all([
+        const [sym, dec, bal] = await Promise.allSettled([
           token.symbol(),
           token.decimals(),
+          token.balanceOf(address),
         ]);
-        if (!cancelled) {
-          setContractState({ tokenAddress: tokenAddr, tokenSymbol: symbol, tokenDecimals: Number(decimals), feeBps, paused, loading: false });
+        if (sym.status === "fulfilled") symbol = sym.value as string;
+        if (dec.status === "fulfilled") decimals = Number(dec.value);
+        if (bal.status === "fulfilled") {
+          walletBalance = formatTokenAmount(bal.value as bigint, decimals);
         }
-      } catch (err) {
-        console.error("Failed to load contract state:", err);
+      } catch {
+        // token metadata unavailable — use defaults
       }
-    })();
-    return () => { cancelled = true; };
-  }, [signer]);
+
+      setContractState({
+        tokenAddress: tokenAddr,
+        tokenSymbol: symbol,
+        tokenDecimals: decimals,
+        feeBps: feeBps as bigint,
+        paused: paused as boolean,
+        walletBalance,
+        loadingBalance: false,
+      });
+    } catch (err) {
+      console.error("Failed to load contract state:", err);
+      setContractState((s) => ({ ...s, loadingBalance: false }));
+    }
+  }, [signer, address]);
+
+  const refreshBalance = useCallback(async () => {
+    if (!signer || !address || !contractState.tokenAddress) return;
+    setContractState((s) => ({ ...s, loadingBalance: true }));
+    try {
+      const token = new ethers.Contract(contractState.tokenAddress, ERC20_ABI, signer);
+      const [paused, bal] = await Promise.allSettled([
+        new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer).paused(),
+        token.balanceOf(address),
+      ]);
+      setContractState((s) => ({
+        ...s,
+        loadingBalance: false,
+        paused: paused.status === "fulfilled" ? (paused.value as boolean) : s.paused,
+        walletBalance: bal.status === "fulfilled"
+          ? formatTokenAmount(bal.value as bigint, s.tokenDecimals)
+          : s.walletBalance,
+      }));
+    } catch {
+      setContractState((s) => ({ ...s, loadingBalance: false }));
+    }
+  }, [signer, address, contractState.tokenAddress, contractState.tokenDecimals]);
+
+  useEffect(() => {
+    loadContractInfo();
+  }, [loadContractInfo]);
 
   const deposit = useCallback(async (amountStr: string) => {
     if (!signer || !address) return;
@@ -99,7 +147,7 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         id: `${receipt.hash}-${Date.now()}`,
         secret,
         amount: amountWei.toString(),
-        amountFormatted: formatTokenAmount(netAmount, tokenDecimals),
+        amountFormatted: formatTokenAmount(netAmount as bigint, tokenDecimals),
         commitment,
         timestamp: Date.now(),
         txHash: receipt.hash,
@@ -108,12 +156,12 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
       saveNote(note);
       refreshNotes();
       setTxStatus("success");
+      refreshBalance();
     } catch (err: unknown) {
-      const msg = parseContractError(err);
-      setTxError(msg);
+      setTxError(parseContractError(err));
       setTxStatus("error");
     }
-  }, [signer, address, contractState, refreshNotes]);
+  }, [signer, address, contractState, refreshNotes, refreshBalance]);
 
   const withdraw = useCallback(async (
     secretOrNoteId: string,
@@ -132,20 +180,22 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
 
       let secret = secretOrNoteId;
       let noteId: string | null = null;
+      let useAmount = amountStr;
 
       if (isNoteId) {
         const note = notes.find((n) => n.id === secretOrNoteId);
         if (!note) throw new Error("Note not found");
         secret = note.secret;
         noteId = note.id;
-        amountStr = formatTokenAmount(BigInt(note.amount), tokenDecimals);
+        useAmount = formatTokenAmount(BigInt(note.amount), tokenDecimals);
       }
 
-      const amountWei = parseTokenAmount(amountStr, tokenDecimals);
+      const amountWei = parseTokenAmount(useAmount, tokenDecimals);
       if (amountWei === 0n) throw new Error("Invalid amount");
 
+      const signerAddress = await signer.getAddress();
       let tx;
-      if (recipient && recipient.toLowerCase() !== (await signer.getAddress()).toLowerCase()) {
+      if (recipient && recipient.toLowerCase() !== signerAddress.toLowerCase()) {
         tx = await pool.withdrawTo(recipient, amountWei, secret);
       } else {
         tx = await pool.withdraw(amountWei, secret);
@@ -159,12 +209,12 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         refreshNotes();
       }
       setTxStatus("success");
+      refreshBalance();
     } catch (err: unknown) {
-      const msg = parseContractError(err);
-      setTxError(msg);
+      setTxError(parseContractError(err));
       setTxStatus("error");
     }
-  }, [signer, contractState, notes, refreshNotes]);
+  }, [signer, contractState, notes, refreshNotes, refreshBalance]);
 
   const resetTx = useCallback(() => {
     setTxStatus("idle");
@@ -172,7 +222,13 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     setTxError(null);
   }, []);
 
-  return { contractState, notes, txStatus, txHash, txError, deposit, withdraw, resetTx, refreshNotes };
+  return {
+    contractState,
+    notes,
+    txStatus, txHash, txError,
+    deposit, withdraw, resetTx,
+    refreshNotes, refreshBalance,
+  };
 }
 
 function parseContractError(err: unknown): string {
@@ -187,7 +243,7 @@ function parseContractError(err: unknown): string {
     if (e.message.includes("InvalidAmount")) return "Invalid amount";
     if (e.message.includes("user rejected")) return "Transaction rejected";
     if (e.message.includes("insufficient funds")) return "Insufficient funds for gas";
-    return e.message.slice(0, 100);
+    return e.message.slice(0, 120);
   }
   return "Transaction failed";
 }

@@ -4,7 +4,7 @@ import {
   CheckCircle2, Copy, Eye, EyeOff, ChevronRight,
   Lock, Info, Bell, Settings, Home as HomeIcon,
   Clock, User, Sun, Moon, Key, AlertCircle,
-  ExternalLink, XCircle,
+  ExternalLink, XCircle, RefreshCw,
 } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import { useContract } from "@/hooks/useContract";
@@ -65,7 +65,7 @@ const light = {
 
 export default function Home() {
   const wallet = useWallet();
-  const { contractState, notes, txStatus, txHash, txError, deposit, withdraw, resetTx } = useContract(
+  const { contractState, notes, txStatus, txHash, txError, deposit, withdraw, resetTx, refreshBalance } = useContract(
     wallet.signer,
     wallet.address
   );
@@ -354,26 +354,52 @@ export default function Home() {
             Chain {wallet.chainId}
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <div>
-            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, margin: "0 0 4px" }}>Shielded Balance</p>
-            <p style={{ color: "white", fontSize: 36, fontWeight: 700, margin: 0, letterSpacing: "-1px" }}>
-              {balanceVisible ? totalShieldedFormatted : "$•••••••"}
+        {/* Wallet token balance */}
+        <div style={{ marginBottom: 8 }}>
+          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, margin: "0 0 2px" }}>
+            Wallet {contractState.tokenSymbol} Balance
+          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <p style={{ color: "white", fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.5px" }}>
+              {balanceVisible
+                ? (contractState.loadingBalance ? "—" : `${parseFloat(contractState.walletBalance).toFixed(2)}`)
+                : "•••••"}
             </p>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, margin: "4px 0 0" }}>
-              {notes.filter((n) => !n.spent).length} active note{notes.filter((n) => !n.spent).length !== 1 ? "s" : ""}
+            <button
+              onClick={refreshBalance}
+              disabled={contractState.loadingBalance}
+              title="Refresh balance"
+              style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            >
+              <RefreshCw style={{ width: 13, height: 13, color: "rgba(255,255,255,0.7)", animation: contractState.loadingBalance ? "spin 1s linear infinite" : "none" }} />
+            </button>
+            <button
+              onClick={() => setBalanceVisible(!balanceVisible)}
+              style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            >
+              {balanceVisible
+                ? <Eye style={{ width: 13, height: 13, color: "rgba(255,255,255,0.7)" }} />
+                : <EyeOff style={{ width: 13, height: 13, color: "rgba(255,255,255,0.7)" }} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Shielded (notes-based) balance */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "6px 14px" }}>
+          <div>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, margin: "0 0 1px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Shielded Notes</p>
+            <p style={{ color: "white", fontSize: 15, fontWeight: 700, margin: 0 }}>
+              {balanceVisible ? totalShieldedFormatted : "$•••••"}
             </p>
           </div>
-          <button
-            onClick={() => setBalanceVisible(!balanceVisible)}
-            style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", marginTop: 20 }}
-          >
-            {balanceVisible
-              ? <Eye style={{ width: 15, height: 15, color: "rgba(255,255,255,0.7)" }} />
-              : <EyeOff style={{ width: 15, height: 15, color: "rgba(255,255,255,0.7)" }} />}
-          </button>
+          <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.15)" }} />
+          <div>
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, margin: "0 0 1px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Active Notes</p>
+            <p style={{ color: "white", fontSize: 15, fontWeight: 700, margin: 0 }}>{notes.filter((n) => !n.spent).length}</p>
+          </div>
         </div>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.12)", borderRadius: 20, padding: "4px 12px", marginTop: 14 }}>
+
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.12)", borderRadius: 20, padding: "4px 12px", marginTop: 10 }}>
           <Shield style={{ width: 12, height: 12, color: "#4ade80" }} />
           <span style={{ color: "#4ade80", fontSize: 11, fontWeight: 600 }}>Shielded by zk-SNARKs</span>
         </div>

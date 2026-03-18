@@ -66,10 +66,12 @@ const light = {
 
 export default function Home() {
   const wallet = useWallet();
-  const { contractState, notes, txStatus, txHash, txError, deposit, withdraw, resetTx, refreshBalance } = useContract(
-    wallet.signer,
-    wallet.address
-  );
+  const {
+    contractState, notes,
+    txStatus, txHash, txError,
+    deposit, withdraw, resetTx, refreshBalance,
+    adminSetFee, adminSetTreasury, adminSetOwner, adminPause, adminUnpause,
+  } = useContract(wallet.signer, wallet.address);
 
   const { username, status: usernameStatus, error: usernameError, checkAvailability, claimUsername } = useUsername(wallet.address);
 
@@ -90,7 +92,16 @@ export default function Home() {
   const [usernameAvail, setUsernameAvail] = useState<{ available: boolean; reason?: string } | null>(null);
   const [checkingAvail, setCheckingAvail] = useState(false);
 
+  // Admin panel state
+  const [adminFeeInput, setAdminFeeInput] = useState("");
+  const [adminTreasuryInput, setAdminTreasuryInput] = useState("");
+  const [adminOwnerInput, setAdminOwnerInput] = useState("");
+  const [adminBusy, setAdminBusy] = useState<string | null>(null); // which action is pending
+  const [adminMsg, setAdminMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
   const t = isDark ? dark : light;
+  const isOwner = !!(wallet.address && contractState.owner &&
+    wallet.address.toLowerCase() === contractState.owner.toLowerCase());
   const wrongNetwork = wallet.address && wallet.chainId !== null && wallet.chainId !== ARC_CHAIN_ID;
 
   const handleSwitchNetwork = async () => {
@@ -164,6 +175,21 @@ export default function Home() {
   const handleClaimUsername = async () => {
     if (!usernameInput || !usernameAvail?.available) return;
     await claimUsername(usernameInput);
+  };
+
+  const runAdminAction = async (key: string, fn: () => Promise<void>, successMsg: string) => {
+    setAdminBusy(key);
+    setAdminMsg(null);
+    try {
+      await fn();
+      setAdminMsg({ type: "ok", text: successMsg });
+    } catch (e: unknown) {
+      const msg = (e as { shortMessage?: string; message?: string })?.shortMessage
+        ?? (e as { message?: string })?.message ?? "Transaction failed";
+      setAdminMsg({ type: "err", text: msg });
+    } finally {
+      setAdminBusy(null);
+    }
   };
 
   const ThemeToggle = () => (
@@ -554,8 +580,141 @@ export default function Home() {
           </div>
         )}
 
+        {/* ── ADMIN PANEL ── */}
+        {activeNav === "admin" && isOwner && (
+          <div style={{ background: t.CARD, borderRadius: 16, border: `1.5px solid ${isDark ? "rgba(251,191,36,0.35)" : "#fde68a"}`, boxShadow: isDark ? "0 4px 32px rgba(0,0,0,0.3)" : "0 2px 16px rgba(0,0,0,0.07)", overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${t.CARD_BORDER}`, display: "flex", alignItems: "center", gap: 8, background: isDark ? "rgba(251,191,36,0.06)" : "#fffbeb" }}>
+              <Settings style={{ width: 15, height: 15, color: "#fbbf24" }} />
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>Admin Panel</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: t.TEXT_MUTED, fontFamily: "monospace" }}>Owner only</span>
+            </div>
+
+            <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+
+              {/* Feedback message */}
+              {adminMsg && (
+                <div style={{ padding: "10px 14px", borderRadius: 10, background: adminMsg.type === "ok" ? t.SUCCESS_BG : t.ERROR_BG, border: `1px solid ${adminMsg.type === "ok" ? t.SUCCESS_BORDER : t.ERROR_BORDER}`, display: "flex", alignItems: "center", gap: 8 }}>
+                  {adminMsg.type === "ok"
+                    ? <CheckCircle2 style={{ width: 14, height: 14, color: t.SUCCESS_COLOR, flexShrink: 0 }} />
+                    : <XCircle style={{ width: 14, height: 14, color: t.ERROR_COLOR, flexShrink: 0 }} />}
+                  <p style={{ margin: 0, fontSize: 12, color: adminMsg.type === "ok" ? t.SUCCESS_COLOR : t.ERROR_COLOR }}>{adminMsg.text}</p>
+                </div>
+              )}
+
+              {/* Current state overview */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ padding: "10px 12px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>
+                  <p style={{ margin: "0 0 2px", fontSize: 10, color: t.TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em" }}>Current Fee</p>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.TEXT }}>{contractState.feeBps > 0n ? `${Number(contractState.feeBps) / 100}%` : "0%"}</p>
+                  <p style={{ margin: "1px 0 0", fontSize: 10, color: t.TEXT_MUTED }}>{contractState.feeBps.toString()} bps</p>
+                </div>
+                <div style={{ padding: "10px 12px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>
+                  <p style={{ margin: "0 0 2px", fontSize: 10, color: t.TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em" }}>Pool Status</p>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: contractState.paused ? t.WITHDRAW_COLOR : t.DEPOSIT_COLOR }}>
+                    {contractState.paused ? "Paused" : "Active"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Treasury address */}
+              <div style={{ padding: "10px 12px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>
+                <p style={{ margin: "0 0 3px", fontSize: 10, color: t.TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em" }}>Treasury Address</p>
+                <p style={{ margin: 0, fontSize: 11, fontFamily: "monospace", color: t.TEXT_MUTED, wordBreak: "break-all" }}>{contractState.treasury ?? "—"}</p>
+              </div>
+
+              <div style={{ borderTop: `1px solid ${t.SEPARATOR}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+
+                {/* Set Fee */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Transfer Fee (basis points)</label>
+                  <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>100 bps = 1%. Current: {contractState.feeBps.toString()} bps</p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="number"
+                      placeholder="e.g. 100"
+                      value={adminFeeInput}
+                      min={0}
+                      max={10000}
+                      onChange={(e) => setAdminFeeInput(e.target.value)}
+                      style={{ flex: 1, padding: "10px 12px", fontSize: 14, color: t.TEXT, border: `1.5px solid ${t.INPUT_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "inherit" }}
+                    />
+                    <button
+                      disabled={!adminFeeInput || adminBusy !== null}
+                      onClick={() => runAdminAction("fee", () => adminSetFee(Number(adminFeeInput)), `Fee updated to ${adminFeeInput} bps`)}
+                      style={{ padding: "10px 18px", borderRadius: 8, background: (!adminFeeInput || adminBusy !== null) ? t.INPUT_BG : "#fbbf24", color: (!adminFeeInput || adminBusy !== null) ? t.TEXT_MUTED : "#78350f", fontWeight: 700, fontSize: 13, border: "none", cursor: (!adminFeeInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                    >
+                      {adminBusy === "fee" ? spinner("#78350f") : "Set Fee"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Set Treasury */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Treasury Address</label>
+                  <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>Address where collected fees are sent</p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="0x…"
+                      value={adminTreasuryInput}
+                      onChange={(e) => setAdminTreasuryInput(e.target.value)}
+                      style={{ flex: 1, padding: "10px 12px", fontSize: 13, color: t.TEXT, border: `1.5px solid ${t.INPUT_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "monospace" }}
+                    />
+                    <button
+                      disabled={!adminTreasuryInput || adminBusy !== null}
+                      onClick={() => runAdminAction("treasury", () => adminSetTreasury(adminTreasuryInput), "Treasury address updated")}
+                      style={{ padding: "10px 18px", borderRadius: 8, background: (!adminTreasuryInput || adminBusy !== null) ? t.INPUT_BG : "#fbbf24", color: (!adminTreasuryInput || adminBusy !== null) ? t.TEXT_MUTED : "#78350f", fontWeight: 700, fontSize: 13, border: "none", cursor: (!adminTreasuryInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                    >
+                      {adminBusy === "treasury" ? spinner("#78350f") : "Update"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pause / Unpause */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Pool State</label>
+                  <button
+                    disabled={adminBusy !== null}
+                    onClick={() => runAdminAction(
+                      "pause",
+                      contractState.paused ? adminUnpause : adminPause,
+                      contractState.paused ? "Pool unpaused — deposits and withdrawals are live" : "Pool paused — all activity halted"
+                    )}
+                    style={{ width: "100%", padding: "11px", borderRadius: 8, background: contractState.paused ? t.DEPOSIT_ICON : t.ERROR_BG, color: contractState.paused ? t.DEPOSIT_COLOR : t.ERROR_COLOR, border: `1.5px solid ${contractState.paused ? t.SUCCESS_BORDER : t.ERROR_BORDER}`, fontWeight: 700, fontSize: 13, cursor: adminBusy !== null ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                  >
+                    {adminBusy === "pause" ? spinner() : contractState.paused ? "▶ Unpause Pool" : "⏸ Pause Pool"}
+                  </button>
+                </div>
+
+                {/* Transfer ownership */}
+                <div style={{ paddingTop: 12, borderTop: `1px solid ${t.SEPARATOR}` }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: t.ERROR_COLOR, display: "block", marginBottom: 6 }}>Transfer Ownership</label>
+                  <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>⚠ This action is irreversible. The new owner will have full control.</p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="New owner 0x…"
+                      value={adminOwnerInput}
+                      onChange={(e) => setAdminOwnerInput(e.target.value)}
+                      style={{ flex: 1, padding: "10px 12px", fontSize: 13, color: t.TEXT, border: `1.5px solid ${t.ERROR_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "monospace" }}
+                    />
+                    <button
+                      disabled={!adminOwnerInput || adminBusy !== null}
+                      onClick={() => runAdminAction("owner", () => adminSetOwner(adminOwnerInput), "Ownership transferred. You are no longer the owner.")}
+                      style={{ padding: "10px 18px", borderRadius: 8, background: (!adminOwnerInput || adminBusy !== null) ? t.INPUT_BG : t.ERROR_BG, color: (!adminOwnerInput || adminBusy !== null) ? t.TEXT_MUTED : t.ERROR_COLOR, fontWeight: 700, fontSize: 13, border: `1px solid ${t.ERROR_BORDER}`, cursor: (!adminOwnerInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                    >
+                      {adminBusy === "owner" ? spinner() : "Transfer"}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action card */}
-        {activeNav !== "profile" && (
+        {activeNav !== "profile" && activeNav !== "admin" && (
         <div style={{ background: t.CARD, borderRadius: 16, border: `1px solid ${t.CARD_BORDER}`, boxShadow: isDark ? "0 4px 32px rgba(0,0,0,0.3)" : "0 2px 16px rgba(0,0,0,0.07)", overflow: "hidden" }}>
           {/* Tabs */}
           <div style={{ display: "flex", borderBottom: `1px solid ${t.CARD_BORDER}` }}>
@@ -849,7 +1008,7 @@ export default function Home() {
         )} {/* end action card conditional */}
 
         {/* Recent on-chain activity section */}
-        {activeNav !== "profile" && (
+        {activeNav !== "profile" && activeNav !== "admin" && (
         <div style={{ background: t.CARD, borderRadius: 16, border: `1px solid ${t.CARD_BORDER}`, overflow: "hidden", marginBottom: 80 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px" }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: t.TEXT }}>My Activity</span>
@@ -903,6 +1062,7 @@ export default function Home() {
           { key: "withdraw", icon: <ArrowUpFromLine style={{ width: 20, height: 20 }} />, label: "Withdraw" },
           { key: "notes", icon: <Key style={{ width: 20, height: 20 }} />, label: "Notes" },
           { key: "profile", icon: <User style={{ width: 20, height: 20 }} />, label: "Profile" },
+          ...(isOwner ? [{ key: "admin", icon: <Settings style={{ width: 20, height: 20 }} />, label: "Admin" }] : []),
         ].map((item) => (
           <button
             key={item.key}

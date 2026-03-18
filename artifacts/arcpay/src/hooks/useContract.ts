@@ -17,6 +17,8 @@ export interface ContractState {
   tokenDecimals: number;
   feeBps: bigint;
   paused: boolean;
+  owner: string | null;
+  treasury: string | null;
   walletBalance: string;
   nativeBalance: string;
   tokenDeployed: boolean;
@@ -33,6 +35,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     tokenDecimals: 6,
     feeBps: 0n,
     paused: false,
+    owner: null,
+    treasury: null,
     walletBalance: "—",
     nativeBalance: "—",
     tokenDeployed: true,
@@ -75,10 +79,12 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     setContractState((s) => ({ ...s, loadingBalance: true, loadError: null }));
     try {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
-      const [tokenAddr, feeBps, paused] = await Promise.all([
+      const [tokenAddr, feeBps, paused, owner, treasury] = await Promise.all([
         pool.token(),
         pool.feeBps(),
         pool.paused(),
+        pool.owner(),
+        pool.treasury(),
       ]);
 
       // Check if ERC20 token contract is actually deployed
@@ -125,6 +131,8 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         tokenDecimals: decimals,
         feeBps: feeBps as bigint,
         paused: paused as boolean,
+        owner: owner as string,
+        treasury: treasury as string,
         walletBalance,
         nativeBalance,
         tokenDeployed,
@@ -338,12 +346,57 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     setTxError(null);
   }, []);
 
+  // ── Admin functions ───────────────────────────────────────────────────────
+
+  const adminSetFee = useCallback(async (newFeeBps: number): Promise<void> => {
+    if (!signer) throw new Error("No wallet connected");
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+    const tx = await pool.setFee(BigInt(newFeeBps));
+    await tx.wait();
+    await refreshBalance();
+  }, [signer, refreshBalance]);
+
+  const adminSetTreasury = useCallback(async (newTreasury: string): Promise<void> => {
+    if (!signer) throw new Error("No wallet connected");
+    if (!ethers.isAddress(newTreasury)) throw new Error("Invalid address");
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+    const tx = await pool.setTreasury(newTreasury);
+    await tx.wait();
+    await refreshBalance();
+  }, [signer, refreshBalance]);
+
+  const adminSetOwner = useCallback(async (newOwner: string): Promise<void> => {
+    if (!signer) throw new Error("No wallet connected");
+    if (!ethers.isAddress(newOwner)) throw new Error("Invalid address");
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+    const tx = await pool.setOwner(newOwner);
+    await tx.wait();
+    await refreshBalance();
+  }, [signer, refreshBalance]);
+
+  const adminPause = useCallback(async (): Promise<void> => {
+    if (!signer) throw new Error("No wallet connected");
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+    const tx = await pool.pause();
+    await tx.wait();
+    await refreshBalance();
+  }, [signer, refreshBalance]);
+
+  const adminUnpause = useCallback(async (): Promise<void> => {
+    if (!signer) throw new Error("No wallet connected");
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+    const tx = await pool.unpause();
+    await tx.wait();
+    await refreshBalance();
+  }, [signer, refreshBalance]);
+
   return {
     contractState,
     notes,
     txStatus, txHash, txError,
     deposit, withdraw, resetTx,
     refreshNotes, refreshBalance,
+    adminSetFee, adminSetTreasury, adminSetOwner, adminPause, adminUnpause,
   };
 }
 

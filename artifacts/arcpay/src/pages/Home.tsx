@@ -360,9 +360,15 @@ export default function Home() {
             Wallet {contractState.tokenSymbol} Balance
           </p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-            <p style={{ color: "white", fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.5px" }}>
+            <p style={{ color: contractState.loadError ? t.ERROR_COLOR : "white", fontSize: 28, fontWeight: 700, margin: 0, letterSpacing: "-0.5px" }}>
               {balanceVisible
-                ? (contractState.loadingBalance ? "—" : `${parseFloat(contractState.walletBalance).toFixed(2)}`)
+                ? contractState.loadingBalance
+                  ? "…"
+                  : contractState.loadError
+                    ? "Error"
+                    : contractState.walletBalance === "—"
+                      ? "—"
+                      : `${parseFloat(contractState.walletBalance).toFixed(2)}`
                 : "•••••"}
             </p>
             <button
@@ -382,6 +388,11 @@ export default function Home() {
                 : <EyeOff style={{ width: 13, height: 13, color: "rgba(255,255,255,0.7)" }} />}
             </button>
           </div>
+          {contractState.loadError && (
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "rgba(248,113,113,0.85)" }}>
+              ⚠ {contractState.loadError}
+            </p>
+          )}
         </div>
 
         {/* Shielded (notes-based) balance */}

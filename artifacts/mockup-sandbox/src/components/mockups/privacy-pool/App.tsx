@@ -99,12 +99,7 @@ export function App() {
       <div className="min-h-screen flex flex-col" style={{ background: BG, fontFamily: "'Inter', system-ui, sans-serif" }}>
         {/* Top bar */}
         <div style={{ background: "#0d0d16", borderBottom: `1px solid ${CARD_BORDER}`, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: PP_BLUE_LIGHT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Shield style={{ width: 16, height: 16, color: PP_BLUE }} />
-            </div>
-            <span style={{ color: TEXT, fontWeight: 700, fontSize: 17, letterSpacing: "-0.3px" }}>PrivacyPool</span>
-          </div>
+          <span style={{ color: TEXT, fontWeight: 700, fontSize: 17, letterSpacing: "-0.3px" }}>Arcpay</span>
           <span style={{ color: TEXT_MUTED, fontSize: 12 }}>Powered by zkShield</span>
         </div>
 
@@ -170,7 +165,6 @@ export function App() {
               {[
                 { icon: <Shield style={{ width: 16, height: 16, color: PP_BLUE }} />, text: "zk-SNARK privacy proofs — link between addresses is broken" },
                 { icon: <Lock style={{ width: 16, height: 16, color: PP_BLUE }} />, text: "Non-custodial — you always control your funds" },
-                { icon: <CheckCircle2 style={{ width: 16, height: 16, color: PP_BLUE }} />, text: "Audited by Quantstamp & OpenZeppelin" },
               ].map((f, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ width: 30, height: 30, borderRadius: 8, background: PP_BLUE_LIGHT, border: `1px solid rgba(59,158,255,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -195,10 +189,7 @@ export function App() {
       {/* Top Nav */}
       <div style={{ background: "#0d0d16", borderBottom: `1px solid ${CARD_BORDER}`, padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: PP_BLUE_LIGHT, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Shield style={{ width: 14, height: 14, color: PP_BLUE }} />
-          </div>
-          <span style={{ color: TEXT, fontWeight: 700, fontSize: 16 }}>PrivacyPool</span>
+          <span style={{ color: TEXT, fontWeight: 700, fontSize: 16 }}>Arcpay</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <Bell style={{ width: 18, height: 18, color: "rgba(255,255,255,0.7)", cursor: "pointer" }} />

@@ -1,0 +1,87 @@
+import { ethers } from "ethers";
+
+export const POOL_ADDRESS = "0xc4f7ccf73c56c6715c6f2eac40f18802fb00b55d";
+
+export const POOL_ABI = [
+  "constructor(address _token)",
+  "function NULLIFIER_DOMAIN() view returns (bytes32)",
+  "function commitmentCount(bytes32) view returns (uint256)",
+  "function computeCommitment(bytes32 secret, uint256 amount) pure returns (bytes32)",
+  "function computeNullifier(bytes32 secret) view returns (bytes32)",
+  "function deposit(uint256 amount, uint256 netAmount, bytes32 commitment) nonpayable",
+  "function feeBps() view returns (uint256)",
+  "function getDepositFee(uint256 amount) view returns (uint256)",
+  "function getNetDepositAmount(uint256 amount) view returns (uint256)",
+  "function owner() view returns (address)",
+  "function pause() nonpayable",
+  "function paused() view returns (bool)",
+  "function setFee(uint256 _feeBps) nonpayable",
+  "function setOwner(address newOwner) nonpayable",
+  "function setTreasury(address _treasury) nonpayable",
+  "function token() view returns (address)",
+  "function treasury() view returns (address)",
+  "function unpause() nonpayable",
+  "function usedNullifiers(bytes32) view returns (bool)",
+  "function withdraw(uint256 amount, bytes32 secret) nonpayable",
+  "function withdrawTo(address recipient, uint256 amount, bytes32 secret) nonpayable",
+  "event Deposited(address indexed token, uint256 amount, bytes32 indexed commitment)",
+  "event Withdrawn(address indexed token, address indexed recipient, uint256 amount, bytes32 indexed nullifier)",
+];
+
+export const ERC20_ABI = [
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+];
+
+export interface Note {
+  id: string;
+  secret: string;
+  amount: string;
+  amountFormatted: string;
+  commitment: string;
+  timestamp: number;
+  txHash: string;
+  spent: boolean;
+}
+
+const NOTES_KEY = "arcpay_notes";
+
+export function saveNote(note: Note) {
+  const notes = loadNotes();
+  notes.unshift(note);
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+}
+
+export function loadNotes(): Note[] {
+  try {
+    return JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function markNoteSpent(id: string) {
+  const notes = loadNotes();
+  const updated = notes.map((n) => (n.id === id ? { ...n, spent: true } : n));
+  localStorage.setItem(NOTES_KEY, JSON.stringify(updated));
+}
+
+export function formatTokenAmount(raw: bigint, decimals: number): string {
+  return ethers.formatUnits(raw, decimals);
+}
+
+export function parseTokenAmount(value: string, decimals: number): bigint {
+  try {
+    return ethers.parseUnits(value, decimals);
+  } catch {
+    return 0n;
+  }
+}
+
+export function shortenAddress(addr: string): string {
+  if (!addr || addr.length < 10) return addr;
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}

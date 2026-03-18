@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Arcpay"
+version = "1.0.0"
+id = "artifacts/arcpay"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 24233
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/arcpay run dev"
+
+[services.env]
+PORT = "24233"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/arcpay", "run", "build"]
+publicDir = "artifacts/arcpay/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

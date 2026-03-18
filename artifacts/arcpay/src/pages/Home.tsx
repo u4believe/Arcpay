@@ -657,7 +657,7 @@ export default function Home() {
                           style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: `1.5px solid ${selectedNoteId === note.id ? t.PP_BLUE : t.INPUT_BORDER}`, background: selectedNoteId === note.id ? t.PP_BLUE_LIGHT : t.INPUT_BG, color: t.TEXT, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left" }}
                         >
                           <div>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: t.TEXT }}>${parseFloat(note.amountFormatted).toFixed(2)} {contractState.tokenSymbol}</p>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: t.TEXT }}>${note.amountFormatted} {contractState.tokenSymbol}</p>
                             <p style={{ margin: "2px 0 0", fontSize: 11, color: t.TEXT_MUTED, fontFamily: "monospace" }}>
                               {new Date(note.timestamp).toLocaleDateString()}
                             </p>
@@ -772,8 +772,22 @@ export default function Home() {
                             </span>
                           )}
                           <span style={{ fontSize: 14, fontWeight: 700, color: note.spent ? t.TEXT_MUTED : t.TEXT, textDecoration: note.spent ? "line-through" : "none" }}>
-                            ${parseFloat(note.amountFormatted).toFixed(2)} {contractState.tokenSymbol}
+                            ${note.amountFormatted} {contractState.tokenSymbol}
                           </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(note.amountFormatted);
+                              setCopiedNoteId(`amt_${note.id}`);
+                              setTimeout(() => setCopiedNoteId(null), 2000);
+                            }}
+                            title={copiedNoteId === `amt_${note.id}` ? "Copied!" : "Copy amount"}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: copiedNoteId === `amt_${note.id}` ? t.DEPOSIT_COLOR : t.TEXT_DIM, flexShrink: 0, transition: "color 0.15s" }}
+                          >
+                            {copiedNoteId === `amt_${note.id}`
+                              ? <CheckCircle2 style={{ width: 12, height: 12 }} />
+                              : <Copy style={{ width: 12, height: 12 }} />}
+                          </button>
                         </div>
                         <span style={{ fontSize: 11, color: t.TEXT_DIM }}>{new Date(note.timestamp).toLocaleDateString()}</span>
                       </div>
@@ -858,7 +872,7 @@ export default function Home() {
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: note.spent ? t.WITHDRAW_COLOR : t.DEPOSIT_COLOR }}>
-                      {note.spent ? "-" : "+"}{parseFloat(note.amountFormatted).toFixed(2)}
+                      {note.spent ? "-" : "+"}{note.amountFormatted}
                     </p>
                     <p style={{ margin: "2px 0 0", fontSize: 11, color: t.TEXT_MUTED }}>
                       {new Date(note.timestamp).toLocaleDateString()}

@@ -646,6 +646,15 @@ export default function Home() {
             {/* ── WITHDRAW ── */}
             {activeTab === "withdraw" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                {/* Anonymity notice */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 14px", background: isDark ? "rgba(59,158,255,0.07)" : "#eff6ff", borderRadius: 10, border: `1px solid ${isDark ? "rgba(59,158,255,0.2)" : "#bfdbfe"}` }}>
+                  <Shield style={{ width: 15, height: 15, color: t.PP_BLUE, flexShrink: 0, marginTop: 1 }} />
+                  <p style={{ margin: 0, fontSize: 12, color: isDark ? "#93c5fd" : "#1d4ed8", lineHeight: 1.5 }}>
+                    To maintain stronger anonymity, connect a different wallet when withdrawing from the same address used for depositing.
+                  </p>
+                </div>
+
                 {notes.filter((n) => !n.spent).length > 0 && (
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Use a saved note</label>

@@ -45,7 +45,26 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
   const [txError, setTxError] = useState<string | null>(null);
 
   const refreshNotes = useCallback(() => {
-    setNotes(address ? loadNotes(address) : []);
+    if (!address) { setNotes([]); return; }
+    const stored = loadNotes(address);
+    setNotes(stored);
+
+    // Silently verify unspent notes against on-chain nullifiers
+    const unspent = stored.filter((n) => !n.spent);
+    if (unspent.length === 0) return;
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
+    Promise.allSettled(
+      unspent.map(async (note) => {
+        try {
+          const nullifier = computeNullifierOffChain(note.secret);
+          const used = await pool.usedNullifiers(nullifier) as boolean;
+          if (used) markNoteSpent(note.id, address);
+        } catch { /* ignore rpc errors */ }
+      })
+    ).then(() => {
+      // Re-load notes after on-chain checks complete
+      setNotes(loadNotes(address));
+    }).catch(() => {});
   }, [address]);
 
   useEffect(() => {

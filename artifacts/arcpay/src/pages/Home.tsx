@@ -742,18 +742,33 @@ export default function Home() {
                   </div>
                 ) : (
                   notes.map((note) => (
-                    <div key={note.id} style={{ padding: "14px", background: note.spent ? t.INPUT_BG : t.CARD, border: `1px solid ${note.spent ? t.INPUT_BORDER : t.CARD_BORDER}`, borderRadius: 10, opacity: note.spent ? 0.5 : 1 }}>
+                    <div key={note.id} style={{
+                      padding: "14px",
+                      background: note.spent ? (isDark ? "rgba(255,255,255,0.02)" : "#f9fafb") : t.CARD,
+                      border: `1.5px solid ${note.spent ? t.INPUT_BORDER : t.CARD_BORDER}`,
+                      borderRadius: 10,
+                    }}>
+                      {/* Header row */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: note.spent ? t.TEXT_DIM : t.DEPOSIT_COLOR }} />
-                          <span style={{ fontSize: 14, fontWeight: 700, color: t.TEXT }}>
+                          {note.spent ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#6b7280", background: isDark ? "rgba(156,163,175,0.12)" : "#f3f4f6", border: `1px solid ${isDark ? "rgba(156,163,175,0.25)" : "#d1d5db"}`, borderRadius: 6, padding: "2px 8px", letterSpacing: "0.04em" }}>
+                              <XCircle style={{ width: 11, height: 11 }} /> WITHDRAWN
+                            </span>
+                          ) : (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: t.DEPOSIT_COLOR, background: t.DEPOSIT_ICON, border: `1px solid ${isDark ? "rgba(74,222,128,0.25)" : "#bbf7d0"}`, borderRadius: 6, padding: "2px 8px", letterSpacing: "0.04em" }}>
+                              <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.DEPOSIT_COLOR }} /> ACTIVE
+                            </span>
+                          )}
+                          <span style={{ fontSize: 14, fontWeight: 700, color: note.spent ? t.TEXT_MUTED : t.TEXT, textDecoration: note.spent ? "line-through" : "none" }}>
                             ${parseFloat(note.amountFormatted).toFixed(2)} {contractState.tokenSymbol}
                           </span>
-                          {note.spent && <span style={{ fontSize: 11, color: t.TEXT_DIM, background: t.INPUT_BG, border: `1px solid ${t.INPUT_BORDER}`, borderRadius: 4, padding: "1px 6px" }}>Spent</span>}
                         </div>
-                        <span style={{ fontSize: 11, color: t.TEXT_MUTED }}>{new Date(note.timestamp).toLocaleDateString()}</span>
+                        <span style={{ fontSize: 11, color: t.TEXT_DIM }}>{new Date(note.timestamp).toLocaleDateString()}</span>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+
+                      {/* Details */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, opacity: note.spent ? 0.55 : 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontSize: 11, color: t.TEXT_DIM, width: 60, flexShrink: 0 }}>Secret</span>
                           <code style={{ fontSize: 10, color: t.TEXT_MUTED, background: t.INPUT_BG, border: `1px solid ${t.INPUT_BORDER}`, borderRadius: 4, padding: "2px 6px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -770,6 +785,8 @@ export default function Home() {
                           </a>
                         </div>
                       </div>
+
+                      {/* Action button — only for active notes */}
                       {!note.spent && (
                         <button
                           onClick={() => { setActiveTab("withdraw"); setSelectedNoteId(note.id); }}

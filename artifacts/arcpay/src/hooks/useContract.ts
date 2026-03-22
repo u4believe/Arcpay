@@ -79,7 +79,9 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     setContractState((s) => ({ ...s, loadingBalance: true, loadError: null }));
     try {
       const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
-      const [tokenAddr, feeBps, paused, owner, treasury] = await Promise.all([
+
+      // Use allSettled so one failing call never prevents owner from loading
+      const [tokenR, feeBpsR, pausedR, ownerR, treasuryR] = await Promise.allSettled([
         pool.token(),
         pool.feeBps(),
         pool.paused(),
@@ -87,9 +89,22 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         pool.treasury(),
       ]);
 
+      const tokenAddr = tokenR.status === "fulfilled" ? tokenR.value as string : null;
+      const feeBps = feeBpsR.status === "fulfilled" ? feeBpsR.value as bigint : 0n;
+      const paused = pausedR.status === "fulfilled" ? pausedR.value as boolean : false;
+      const owner = ownerR.status === "fulfilled" ? ownerR.value as string : null;
+      const treasury = treasuryR.status === "fulfilled" ? treasuryR.value as string : null;
+
+      console.log("[Arcpay] contract load — owner:", owner, "treasury:", treasury, "feeBps:", feeBps?.toString());
+
       // Check if ERC20 token contract is actually deployed
-      const tokenCode = await readProvider.getCode(tokenAddr as string);
-      const tokenDeployed = tokenCode !== "0x" && tokenCode.length > 2;
+      let tokenDeployed = false;
+      if (tokenAddr) {
+        try {
+          const tokenCode = await readProvider.getCode(tokenAddr);
+          tokenDeployed = tokenCode !== "0x" && tokenCode.length > 2;
+        } catch { /* treat as not deployed */ }
+      }
 
       let symbol = "TOKEN";
       let decimals = 6;
@@ -125,20 +140,21 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
         nativeBalance = parseFloat(ethers.formatEther(natBal)).toFixed(4);
       }
 
-      setContractState({
-        tokenAddress: tokenAddr as string,
+      setContractState((s) => ({
+        ...s,
+        tokenAddress: tokenAddr ?? s.tokenAddress,
         tokenSymbol: symbol,
         tokenDecimals: decimals,
-        feeBps: feeBps as bigint,
-        paused: paused as boolean,
-        owner: owner as string,
-        treasury: treasury as string,
+        feeBps,
+        paused,
+        owner: owner ?? s.owner,
+        treasury: treasury ?? s.treasury,
         walletBalance,
         nativeBalance,
         tokenDeployed,
         loadingBalance: false,
         loadError: null,
-      });
+      }));
     } catch (err: unknown) {
       const msg = (err as { shortMessage?: string; message?: string })?.shortMessage
         || (err as { message?: string })?.message || "Failed to load";
@@ -192,6 +208,21 @@ export function useContract(signer: ethers.JsonRpcSigner | null, address: string
     loadContractInfo(address);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
+
+  // Safety net: if owner is still null after wallet connects, retry independently
+  useEffect(() => {
+    if (!address || contractState.owner) return;
+    const pool = new ethers.Contract(POOL_ADDRESS, POOL_ABI, readProvider);
+    Promise.allSettled([pool.owner(), pool.treasury()]).then(([ownerR, treasuryR]) => {
+      const owner = ownerR.status === "fulfilled" ? ownerR.value as string : null;
+      const treasury = treasuryR.status === "fulfilled" ? treasuryR.value as string : null;
+      if (owner) {
+        console.log("[Arcpay] owner retry succeeded:", owner);
+        setContractState((s) => ({ ...s, owner: owner ?? s.owner, treasury: treasury ?? s.treasury }));
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, contractState.owner]);
 
   // ── Deposit ──────────────────────────────────────────────────────────────
 

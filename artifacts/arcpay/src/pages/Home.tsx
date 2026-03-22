@@ -568,8 +568,19 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Contract owner info */}
+              <div style={{ marginTop: 16, padding: "10px 14px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>
+                <p style={{ margin: "0 0 3px", fontSize: 11, color: t.TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em" }}>Contract Owner</p>
+                <p style={{ margin: 0, fontFamily: "monospace", fontSize: 11, color: t.TEXT_MUTED, wordBreak: "break-all" }}>
+                  {contractState.owner ?? "Loading…"}
+                </p>
+                {isOwner && (
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#fbbf24", fontWeight: 600 }}>✓ You are the contract owner — Admin tab visible in nav</p>
+                )}
+              </div>
+
               {/* Note backup reminder */}
-              <div style={{ marginTop: 20, padding: "12px 14px", background: isDark ? "rgba(251,191,36,0.07)" : "#fffbeb", borderRadius: 10, border: `1px solid rgba(251,191,36,0.3)` }}>
+              <div style={{ marginTop: 12, padding: "12px 14px", background: isDark ? "rgba(251,191,36,0.07)" : "#fffbeb", borderRadius: 10, border: `1px solid rgba(251,191,36,0.3)` }}>
                 <p style={{ margin: "0 0 3px", fontSize: 12, fontWeight: 700, color: "#fbbf24" }}>⚠ Back up your notes</p>
                 <p style={{ margin: 0, fontSize: 12, color: t.TEXT_MUTED, lineHeight: 1.5 }}>
                   Your shielded notes are stored locally in this browser. Export or copy your secrets — if you clear browser data, your funds cannot be recovered.

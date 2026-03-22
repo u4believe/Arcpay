@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import { useContract } from "@/hooks/useContract";
-import { useUsername } from "@/hooks/useUsername";
 import { shortenAddress, formatTokenAmount, POOL_ADDRESS } from "@/lib/contract";
 import { ARC_CHAIN_ID, switchToArc } from "@/lib/network";
 
@@ -73,8 +72,6 @@ export default function Home() {
     adminSetFee, adminSetTreasury, adminSetOwner, adminPause, adminUnpause,
   } = useContract(wallet.signer, wallet.address);
 
-  const { username, status: usernameStatus, error: usernameError, checkAvailability, claimUsername } = useUsername(wallet.address);
-
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
@@ -88,9 +85,6 @@ export default function Home() {
   const [isDark, setIsDark] = useState(true);
   const [switchingNetwork, setSwitchingNetwork] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [usernameInput, setUsernameInput] = useState("");
-  const [usernameAvail, setUsernameAvail] = useState<{ available: boolean; reason?: string } | null>(null);
-  const [checkingAvail, setCheckingAvail] = useState(false);
 
   // Admin panel state
   const [adminFeeInput, setAdminFeeInput] = useState("");
@@ -161,21 +155,6 @@ export default function Home() {
 
   const isDepositBusy = txStatus === "approving" || txStatus === "depositing";
   const isWithdrawBusy = txStatus === "withdrawing";
-
-  const handleCheckUsername = async (val: string) => {
-    setUsernameInput(val);
-    setUsernameAvail(null);
-    if (val.length < 3) return;
-    setCheckingAvail(true);
-    const result = await checkAvailability(val);
-    setUsernameAvail(result);
-    setCheckingAvail(false);
-  };
-
-  const handleClaimUsername = async () => {
-    if (!usernameInput || !usernameAvail?.available) return;
-    await claimUsername(usernameInput);
-  };
 
   const runAdminAction = async (key: string, fn: () => Promise<void>, successMsg: string) => {
     setAdminBusy(key);
@@ -365,9 +344,6 @@ export default function Home() {
                 <div onClick={() => setShowProfileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
                 <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: t.CARD, border: `1px solid ${t.CARD_BORDER}`, borderRadius: 12, boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 200, overflow: "hidden" }}>
                   <div style={{ padding: "12px 14px", borderBottom: `1px solid ${t.SEPARATOR}` }}>
-                    {username && (
-                      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: t.PP_BLUE }}>@{username}</p>
-                    )}
                     <p style={{ margin: 0, fontSize: 11, color: t.TEXT_MUTED }}>Connected wallet</p>
                     <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 600, color: t.TEXT, fontFamily: "monospace" }}>{shortenAddress(wallet.address)}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 11, color: t.TEXT_MUTED }}>Chain ID: {wallet.chainId}</p>
@@ -505,68 +481,6 @@ export default function Home() {
                 <p style={{ margin: "0 0 4px", fontSize: 11, color: t.TEXT_MUTED, textTransform: "uppercase", letterSpacing: "0.06em" }}>Wallet Address</p>
                 <p style={{ margin: 0, fontFamily: "monospace", fontSize: 13, color: t.TEXT, wordBreak: "break-all" }}>{wallet.address}</p>
               </div>
-
-              {/* Username section */}
-              <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: t.TEXT }}>Username</p>
-
-              {username ? (
-                /* Username already set — locked forever */
-                <div style={{ padding: "14px 16px", background: t.INPUT_BG, borderRadius: 10, border: `1.5px solid ${t.PP_BLUE}`, display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: t.PP_BLUE_LIGHT, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <User style={{ width: 18, height: 18, color: t.PP_BLUE }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: t.PP_BLUE }}>@{username}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 11, color: t.TEXT_MUTED }}>Permanently linked to this wallet</p>
-                  </div>
-                  <Lock style={{ width: 16, height: 16, color: t.TEXT_MUTED, flexShrink: 0 }} />
-                </div>
-              ) : (
-                /* Username not set yet */
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <p style={{ margin: 0, fontSize: 12, color: t.TEXT_MUTED, lineHeight: 1.5 }}>
-                    Choose a unique username for your wallet. Once set, it <strong>cannot be changed</strong>.
-                  </p>
-
-                  <div style={{ position: "relative" }}>
-                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: t.TEXT_MUTED, fontWeight: 600 }}>@</span>
-                    <input
-                      type="text"
-                      placeholder="your_username"
-                      value={usernameInput}
-                      maxLength={20}
-                      onChange={(e) => handleCheckUsername(e.target.value)}
-                      disabled={usernameStatus === "saving" || usernameStatus === "saved"}
-                      style={{ width: "100%", padding: "12px 14px 12px 28px", fontSize: 15, fontWeight: 600, color: t.TEXT, border: `1.5px solid ${usernameAvail === null ? t.INPUT_BORDER : usernameAvail.available ? "#4ade80" : "#f87171"}`, borderRadius: 10, outline: "none", boxSizing: "border-box", background: t.INPUT_BG, fontFamily: "inherit" }}
-                    />
-                    {checkingAvail && (
-                      <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: "2px solid #6b7280", borderTopColor: "transparent", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
-                    )}
-                  </div>
-
-                  {usernameAvail !== null && !checkingAvail && (
-                    <p style={{ margin: 0, fontSize: 12, color: usernameAvail.available ? "#4ade80" : "#f87171" }}>
-                      {usernameAvail.available ? "✓ Available" : `✗ ${usernameAvail.reason ?? "Already taken"}`}
-                    </p>
-                  )}
-
-                  {usernameError && (
-                    <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>✗ {usernameError}</p>
-                  )}
-
-                  <button
-                    onClick={handleClaimUsername}
-                    disabled={!usernameAvail?.available || usernameStatus === "saving"}
-                    style={{ padding: "13px", borderRadius: 10, background: usernameAvail?.available ? t.PP_BLUE : t.INPUT_BG, color: usernameAvail?.available ? "white" : t.TEXT_MUTED, fontWeight: 700, fontSize: 14, border: usernameAvail?.available ? "none" : `1px solid ${t.CARD_BORDER}`, cursor: usernameAvail?.available ? "pointer" : "default", transition: "all 0.2s" }}
-                  >
-                    {usernameStatus === "saving" ? "Saving…" : "Claim Username"}
-                  </button>
-
-                  <p style={{ margin: 0, fontSize: 11, color: t.TEXT_DIM, textAlign: "center" }}>
-                    3–20 characters · letters, numbers, _ or -
-                  </p>
-                </div>
-              )}
 
               {/* Contract owner info */}
               <div style={{ marginTop: 16, padding: "10px 14px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>

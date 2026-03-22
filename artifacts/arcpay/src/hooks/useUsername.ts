@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { API_BASE } from "@/lib/api";
 
 export type UsernameStatus = "idle" | "checking" | "saving" | "saved" | "error";
 
@@ -11,7 +12,7 @@ export function useUsername(address: string | null) {
   const fetchUsername = useCallback(async (addr: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/username/${addr.toLowerCase()}`);
+      const res = await fetch(`${API_BASE}/api/username/${addr.toLowerCase()}`);
       if (res.ok) {
         const data = await res.json() as { username: string };
         setUsername(data.username);
@@ -36,7 +37,7 @@ export function useUsername(address: string | null) {
   const checkAvailability = useCallback(async (name: string): Promise<{ available: boolean; reason?: string }> => {
     if (!name) return { available: false, reason: "Enter a username" };
     try {
-      const res = await fetch(`/api/username/check/${encodeURIComponent(name)}`);
+      const res = await fetch(`${API_BASE}/api/username/check/${encodeURIComponent(name)}`);
       return await res.json() as { available: boolean; reason?: string };
     } catch {
       return { available: false, reason: "Network error" };
@@ -48,7 +49,7 @@ export function useUsername(address: string | null) {
     setStatus("saving");
     setError(null);
     try {
-      const res = await fetch("/api/username", {
+      const res = await fetch(`${API_BASE}/api/username`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, username: name }),

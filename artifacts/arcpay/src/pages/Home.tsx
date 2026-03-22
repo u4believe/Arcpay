@@ -592,15 +592,29 @@ export default function Home() {
         )}
 
         {/* ── ADMIN PANEL ── */}
-        {activeNav === "admin" && isOwner && (
+        {activeNav === "admin" && (
           <div style={{ background: t.CARD, borderRadius: 16, border: `1.5px solid ${isDark ? "rgba(251,191,36,0.35)" : "#fde68a"}`, boxShadow: isDark ? "0 4px 32px rgba(0,0,0,0.3)" : "0 2px 16px rgba(0,0,0,0.07)", overflow: "hidden" }}>
             <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${t.CARD_BORDER}`, display: "flex", alignItems: "center", gap: 8, background: isDark ? "rgba(251,191,36,0.06)" : "#fffbeb" }}>
               <Settings style={{ width: 15, height: 15, color: "#fbbf24" }} />
               <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>Admin Panel</span>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: t.TEXT_MUTED, fontFamily: "monospace" }}>Owner only</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: isOwner ? "#fbbf24" : t.TEXT_MUTED, fontWeight: isOwner ? 700 : 400 }}>
+                {isOwner ? "✓ You are the owner" : "Read-only"}
+              </span>
             </div>
 
             <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+
+              {/* Not-owner notice */}
+              {!isOwner && (
+                <div style={{ padding: "12px 14px", borderRadius: 10, background: t.INPUT_BG, border: `1px solid ${t.INPUT_BORDER}` }}>
+                  <p style={{ margin: "0 0 3px", fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED }}>
+                    {!wallet.address ? "Connect your wallet to manage the pool" : "Your wallet is not the contract owner"}
+                  </p>
+                  <p style={{ margin: 0, fontSize: 11, color: t.TEXT_DIM, fontFamily: "monospace", wordBreak: "break-all" }}>
+                    Owner: {contractState.owner ?? "loading…"}
+                  </p>
+                </div>
+              )}
 
               {/* Feedback message */}
               {adminMsg && (
@@ -612,7 +626,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Current state overview */}
+              {/* Current state overview — always visible */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ padding: "10px 12px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>
                   <p style={{ margin: "0 0 2px", fontSize: 10, color: t.TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em" }}>Current Fee</p>
@@ -627,99 +641,102 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Treasury address */}
+              {/* Treasury address — always visible */}
               <div style={{ padding: "10px 12px", background: t.INPUT_BG, borderRadius: 10, border: `1px solid ${t.INPUT_BORDER}` }}>
                 <p style={{ margin: "0 0 3px", fontSize: 10, color: t.TEXT_DIM, textTransform: "uppercase", letterSpacing: "0.06em" }}>Treasury Address</p>
                 <p style={{ margin: 0, fontSize: 11, fontFamily: "monospace", color: t.TEXT_MUTED, wordBreak: "break-all" }}>{contractState.treasury ?? "—"}</p>
               </div>
 
-              <div style={{ borderTop: `1px solid ${t.SEPARATOR}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Write actions — owner only */}
+              {isOwner && (
+                <div style={{ borderTop: `1px solid ${t.SEPARATOR}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
 
-                {/* Set Fee */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Transfer Fee (basis points)</label>
-                  <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>100 bps = 1%. Current: {contractState.feeBps.toString()} bps</p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      type="number"
-                      placeholder="e.g. 100"
-                      value={adminFeeInput}
-                      min={0}
-                      max={10000}
-                      onChange={(e) => setAdminFeeInput(e.target.value)}
-                      style={{ flex: 1, padding: "10px 12px", fontSize: 14, color: t.TEXT, border: `1.5px solid ${t.INPUT_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "inherit" }}
-                    />
+                  {/* Set Fee */}
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Transfer Fee (basis points)</label>
+                    <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>100 bps = 1%. Current: {contractState.feeBps.toString()} bps</p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="number"
+                        placeholder="e.g. 100"
+                        value={adminFeeInput}
+                        min={0}
+                        max={10000}
+                        onChange={(e) => setAdminFeeInput(e.target.value)}
+                        style={{ flex: 1, padding: "10px 12px", fontSize: 14, color: t.TEXT, border: `1.5px solid ${t.INPUT_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "inherit" }}
+                      />
+                      <button
+                        disabled={!adminFeeInput || adminBusy !== null}
+                        onClick={() => runAdminAction("fee", () => adminSetFee(Number(adminFeeInput)), `Fee updated to ${adminFeeInput} bps`)}
+                        style={{ padding: "10px 18px", borderRadius: 8, background: (!adminFeeInput || adminBusy !== null) ? t.INPUT_BG : "#fbbf24", color: (!adminFeeInput || adminBusy !== null) ? t.TEXT_MUTED : "#78350f", fontWeight: 700, fontSize: 13, border: "none", cursor: (!adminFeeInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                      >
+                        {adminBusy === "fee" ? spinner("#78350f") : "Set Fee"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Set Treasury */}
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Treasury Address</label>
+                    <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>Address where collected fees are sent</p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="0x…"
+                        value={adminTreasuryInput}
+                        onChange={(e) => setAdminTreasuryInput(e.target.value)}
+                        style={{ flex: 1, padding: "10px 12px", fontSize: 13, color: t.TEXT, border: `1.5px solid ${t.INPUT_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "monospace" }}
+                      />
+                      <button
+                        disabled={!adminTreasuryInput || adminBusy !== null}
+                        onClick={() => runAdminAction("treasury", () => adminSetTreasury(adminTreasuryInput), "Treasury address updated")}
+                        style={{ padding: "10px 18px", borderRadius: 8, background: (!adminTreasuryInput || adminBusy !== null) ? t.INPUT_BG : "#fbbf24", color: (!adminTreasuryInput || adminBusy !== null) ? t.TEXT_MUTED : "#78350f", fontWeight: 700, fontSize: 13, border: "none", cursor: (!adminTreasuryInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                      >
+                        {adminBusy === "treasury" ? spinner("#78350f") : "Update"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Pause / Unpause */}
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Pool State</label>
                     <button
-                      disabled={!adminFeeInput || adminBusy !== null}
-                      onClick={() => runAdminAction("fee", () => adminSetFee(Number(adminFeeInput)), `Fee updated to ${adminFeeInput} bps`)}
-                      style={{ padding: "10px 18px", borderRadius: 8, background: (!adminFeeInput || adminBusy !== null) ? t.INPUT_BG : "#fbbf24", color: (!adminFeeInput || adminBusy !== null) ? t.TEXT_MUTED : "#78350f", fontWeight: 700, fontSize: 13, border: "none", cursor: (!adminFeeInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                      disabled={adminBusy !== null}
+                      onClick={() => runAdminAction(
+                        "pause",
+                        contractState.paused ? adminUnpause : adminPause,
+                        contractState.paused ? "Pool unpaused — deposits and withdrawals are live" : "Pool paused — all activity halted"
+                      )}
+                      style={{ width: "100%", padding: "11px", borderRadius: 8, background: contractState.paused ? t.DEPOSIT_ICON : t.ERROR_BG, color: contractState.paused ? t.DEPOSIT_COLOR : t.ERROR_COLOR, border: `1.5px solid ${contractState.paused ? t.SUCCESS_BORDER : t.ERROR_BORDER}`, fontWeight: 700, fontSize: 13, cursor: adminBusy !== null ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
-                      {adminBusy === "fee" ? spinner("#78350f") : "Set Fee"}
+                      {adminBusy === "pause" ? spinner() : contractState.paused ? "▶ Unpause Pool" : "⏸ Pause Pool"}
                     </button>
                   </div>
-                </div>
 
-                {/* Set Treasury */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Treasury Address</label>
-                  <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>Address where collected fees are sent</p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      type="text"
-                      placeholder="0x…"
-                      value={adminTreasuryInput}
-                      onChange={(e) => setAdminTreasuryInput(e.target.value)}
-                      style={{ flex: 1, padding: "10px 12px", fontSize: 13, color: t.TEXT, border: `1.5px solid ${t.INPUT_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "monospace" }}
-                    />
-                    <button
-                      disabled={!adminTreasuryInput || adminBusy !== null}
-                      onClick={() => runAdminAction("treasury", () => adminSetTreasury(adminTreasuryInput), "Treasury address updated")}
-                      style={{ padding: "10px 18px", borderRadius: 8, background: (!adminTreasuryInput || adminBusy !== null) ? t.INPUT_BG : "#fbbf24", color: (!adminTreasuryInput || adminBusy !== null) ? t.TEXT_MUTED : "#78350f", fontWeight: 700, fontSize: 13, border: "none", cursor: (!adminTreasuryInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
-                    >
-                      {adminBusy === "treasury" ? spinner("#78350f") : "Update"}
-                    </button>
+                  {/* Transfer ownership */}
+                  <div style={{ paddingTop: 12, borderTop: `1px solid ${t.SEPARATOR}` }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: t.ERROR_COLOR, display: "block", marginBottom: 6 }}>Transfer Ownership</label>
+                    <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>⚠ This action is irreversible. The new owner will have full control.</p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="New owner 0x…"
+                        value={adminOwnerInput}
+                        onChange={(e) => setAdminOwnerInput(e.target.value)}
+                        style={{ flex: 1, padding: "10px 12px", fontSize: 13, color: t.TEXT, border: `1.5px solid ${t.ERROR_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "monospace" }}
+                      />
+                      <button
+                        disabled={!adminOwnerInput || adminBusy !== null}
+                        onClick={() => runAdminAction("owner", () => adminSetOwner(adminOwnerInput), "Ownership transferred. You are no longer the owner.")}
+                        style={{ padding: "10px 18px", borderRadius: 8, background: (!adminOwnerInput || adminBusy !== null) ? t.INPUT_BG : t.ERROR_BG, color: (!adminOwnerInput || adminBusy !== null) ? t.TEXT_MUTED : t.ERROR_COLOR, fontWeight: 700, fontSize: 13, border: `1px solid ${t.ERROR_BORDER}`, cursor: (!adminOwnerInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
+                      >
+                        {adminBusy === "owner" ? spinner() : "Transfer"}
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Pause / Unpause */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED, display: "block", marginBottom: 6 }}>Pool State</label>
-                  <button
-                    disabled={adminBusy !== null}
-                    onClick={() => runAdminAction(
-                      "pause",
-                      contractState.paused ? adminUnpause : adminPause,
-                      contractState.paused ? "Pool unpaused — deposits and withdrawals are live" : "Pool paused — all activity halted"
-                    )}
-                    style={{ width: "100%", padding: "11px", borderRadius: 8, background: contractState.paused ? t.DEPOSIT_ICON : t.ERROR_BG, color: contractState.paused ? t.DEPOSIT_COLOR : t.ERROR_COLOR, border: `1.5px solid ${contractState.paused ? t.SUCCESS_BORDER : t.ERROR_BORDER}`, fontWeight: 700, fontSize: 13, cursor: adminBusy !== null ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                  >
-                    {adminBusy === "pause" ? spinner() : contractState.paused ? "▶ Unpause Pool" : "⏸ Pause Pool"}
-                  </button>
                 </div>
-
-                {/* Transfer ownership */}
-                <div style={{ paddingTop: 12, borderTop: `1px solid ${t.SEPARATOR}` }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: t.ERROR_COLOR, display: "block", marginBottom: 6 }}>Transfer Ownership</label>
-                  <p style={{ margin: "0 0 8px", fontSize: 11, color: t.TEXT_DIM }}>⚠ This action is irreversible. The new owner will have full control.</p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      type="text"
-                      placeholder="New owner 0x…"
-                      value={adminOwnerInput}
-                      onChange={(e) => setAdminOwnerInput(e.target.value)}
-                      style={{ flex: 1, padding: "10px 12px", fontSize: 13, color: t.TEXT, border: `1.5px solid ${t.ERROR_BORDER}`, borderRadius: 8, outline: "none", background: t.INPUT_BG, fontFamily: "monospace" }}
-                    />
-                    <button
-                      disabled={!adminOwnerInput || adminBusy !== null}
-                      onClick={() => runAdminAction("owner", () => adminSetOwner(adminOwnerInput), "Ownership transferred. You are no longer the owner.")}
-                      style={{ padding: "10px 18px", borderRadius: 8, background: (!adminOwnerInput || adminBusy !== null) ? t.INPUT_BG : t.ERROR_BG, color: (!adminOwnerInput || adminBusy !== null) ? t.TEXT_MUTED : t.ERROR_COLOR, fontWeight: 700, fontSize: 13, border: `1px solid ${t.ERROR_BORDER}`, cursor: (!adminOwnerInput || adminBusy !== null) ? "default" : "pointer", flexShrink: 0 }}
-                    >
-                      {adminBusy === "owner" ? spinner() : "Transfer"}
-                    </button>
-                  </div>
-                </div>
-
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -1073,7 +1090,7 @@ export default function Home() {
           { key: "withdraw", icon: <ArrowUpFromLine style={{ width: 20, height: 20 }} />, label: "Withdraw" },
           { key: "notes", icon: <Key style={{ width: 20, height: 20 }} />, label: "Notes" },
           { key: "profile", icon: <User style={{ width: 20, height: 20 }} />, label: "Profile" },
-          ...(isOwner ? [{ key: "admin", icon: <Settings style={{ width: 20, height: 20 }} />, label: "Admin" }] : []),
+          { key: "admin", icon: <Settings style={{ width: 20, height: 20 }} />, label: "Admin" },
         ].map((item) => (
           <button
             key={item.key}

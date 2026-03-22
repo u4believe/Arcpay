@@ -592,29 +592,15 @@ export default function Home() {
         )}
 
         {/* ── ADMIN PANEL ── */}
-        {activeNav === "admin" && (
-          <div style={{ background: t.CARD, borderRadius: 16, border: `1.5px solid ${isDark ? "rgba(251,191,36,0.35)" : "#fde68a"}`, boxShadow: isDark ? "0 4px 32px rgba(0,0,0,0.3)" : "0 2px 16px rgba(0,0,0,0.07)", overflow: "hidden" }}>
+        {activeNav === "admin" && isOwner && (
+          <div style={{ background: t.CARD, borderRadius: 16, border: `1.5px solid ${isDark ? "rgba(251,191,36,0.35)" : "#fde68a"}`, boxShadow: isDark ? "0 4px 32px rgba(0,0,0,0.3)" : "0 2px 16px rgba(0,0,0,0.07)", overflow: "hidden", marginBottom: 90 }}>
             <div style={{ padding: "16px 20px 12px", borderBottom: `1px solid ${t.CARD_BORDER}`, display: "flex", alignItems: "center", gap: 8, background: isDark ? "rgba(251,191,36,0.06)" : "#fffbeb" }}>
               <Settings style={{ width: 15, height: 15, color: "#fbbf24" }} />
               <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>Admin Panel</span>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: isOwner ? "#fbbf24" : t.TEXT_MUTED, fontWeight: isOwner ? 700 : 400 }}>
-                {isOwner ? "✓ You are the owner" : "Read-only"}
-              </span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "#fbbf24", fontWeight: 700 }}>✓ Owner</span>
             </div>
 
             <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
-
-              {/* Not-owner notice */}
-              {!isOwner && (
-                <div style={{ padding: "12px 14px", borderRadius: 10, background: t.INPUT_BG, border: `1px solid ${t.INPUT_BORDER}` }}>
-                  <p style={{ margin: "0 0 3px", fontSize: 12, fontWeight: 600, color: t.TEXT_MUTED }}>
-                    {!wallet.address ? "Connect your wallet to manage the pool" : "Your wallet is not the contract owner"}
-                  </p>
-                  <p style={{ margin: 0, fontSize: 11, color: t.TEXT_DIM, fontFamily: "monospace", wordBreak: "break-all" }}>
-                    Owner: {contractState.owner ?? "loading…"}
-                  </p>
-                </div>
-              )}
 
               {/* Feedback message */}
               {adminMsg && (
@@ -647,9 +633,8 @@ export default function Home() {
                 <p style={{ margin: 0, fontSize: 11, fontFamily: "monospace", color: t.TEXT_MUTED, wordBreak: "break-all" }}>{contractState.treasury ?? "—"}</p>
               </div>
 
-              {/* Write actions — owner only */}
-              {isOwner && (
-                <div style={{ borderTop: `1px solid ${t.SEPARATOR}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Write actions */}
+              <div style={{ borderTop: `1px solid ${t.SEPARATOR}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
 
                   {/* Set Fee */}
                   <div>
@@ -735,8 +720,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                </div>
-              )}
+              </div>
             </div>
           </div>
         )}
@@ -1090,7 +1074,7 @@ export default function Home() {
           { key: "withdraw", icon: <ArrowUpFromLine style={{ width: 20, height: 20 }} />, label: "Withdraw" },
           { key: "notes", icon: <Key style={{ width: 20, height: 20 }} />, label: "Notes" },
           { key: "profile", icon: <User style={{ width: 20, height: 20 }} />, label: "Profile" },
-          { key: "admin", icon: <Settings style={{ width: 20, height: 20 }} />, label: "Admin" },
+          ...(isOwner ? [{ key: "admin", icon: <Settings style={{ width: 20, height: 20 }} />, label: "Admin" }] : []),
         ].map((item) => (
           <button
             key={item.key}
